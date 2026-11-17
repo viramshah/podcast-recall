@@ -4,10 +4,10 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 
 | ID | Question | Options | Recommendation | Status | Decision | Date |
 |---|---|---|---|---|---|---|
-| D1 | Spotify in v1? | (a) Defer to v1.1. (b) Borrow a Premium account for the app owner. | (a) Defer | Open | | |
-| D2 | Video-only YouTube podcasts with no RSS feed | (a) Mark "not indexable". (b) `yt-dlp` audio plus local transcription, personal use only. | (a) for testers; (b) only for your own library, after checking YouTube ToS | Open | | |
-| D3 | OAuth app status | (a) Testing mode: up to 100 named test users, weekly re-auth. (b) Publish: needs Google verification. | (a) for MVP | Open | | |
-| D4 | "Heard" status (YouTube has no resume_point) | (a) Ignore in v1. (b) Google Takeout watch-history upload. | (a); revisit after Week 3 | Open | | |
+| D1 | Spotify in v1? | (a) Defer to v1.1. (b) Borrow a Premium account for the app owner. | (a) Defer | **Decided** | (a) Defer to v1.1. v1 is YouTube-only; no Spotify Premium. | 2026-11-17 |
+| D2 | Video-only YouTube podcasts with no RSS feed | (a) Mark "not indexable". (b) `yt-dlp` audio plus local transcription, personal use only. | (a) for testers; (b) only for your own library, after checking YouTube ToS | **Interim** | (a) for now: no-feed videos are "not indexable". 3 of the 20 seed episodes are kept as video-only tests. Revisit in Week 1 after reading YouTube ToS and Qualtrics rules. | 2026-11-17 |
+| D3 | OAuth app status | (a) Testing mode: up to 100 named test users, weekly re-auth. (b) Publish: needs Google verification. | (a) for MVP | **Decided** | (a) Testing mode. Google Cloud project is already set up this way; tell testers they must sign in again about weekly. | 2026-11-17 |
+| D4 | "Heard" status (YouTube has no resume_point) | (a) Ignore in v1. (b) Google Takeout watch-history upload. | (a); revisit after Week 3 | **Interim** | (a) Ignore "heard" status in v1. Revisit after Week 3. | 2026-11-17 |
 | D5 | Rubric thresholds | Quote match 0.90; timestamp window +/-15 s; "Partly supported" fails an answer | Accept the proposals unless the Week 2 pilot disagrees | Open | | |
 | D6 | Who second-labels 30 golden items (20 in Week 2) | A tester, colleague or friend who listens | Name a person before Week 2; about 3 hrs | Open | | |
 | D7 | Front end | (a) Ask IT for an MCP exception. (b) Personal machine and account. (c) Local web chat plus CLI on the same core code. | (c) | **Decided** | (c) Local web chat (FastAPI, localhost) plus a CLI over a shared core library. MCP is deferred to an optional thin adapter. | 2026-11-16 |

@@ -117,13 +117,13 @@ Pick sizes for a 16GB Mac. Use model names that exist in the Ollama library when
 2. Record your reading in `specs/decisions.md` under D1. Given no Premium, this is a v1.1 item.
 
 ### 0.10 Week 0 exit gate
-- [ ] Both Ollama models answer; embeddings model works
-- [ ] Whisper transcript with word timestamps exists
-- [ ] YouTube subscriptions list prints
-- [ ] Podcast Index search returns feeds
-- [ ] The local chat page at `127.0.0.1:8000` gets a reply from Ollama
-- [ ] `seed_episodes.csv` has 20 rows
-- [ ] D1-D7 recorded in `specs/decisions.md` (D8 can stay open until Week 4)
+- [x] Both Ollama models answer; embeddings model works (models pulled; speed numbers not recorded)
+- [x] Whisper transcript with word timestamps exists (RTF about 0.14-0.24)
+- [x] YouTube subscriptions list prints
+- [x] Podcast Index search returns feeds
+- [x] The local chat page at `127.0.0.1:8000` gets a reply from Ollama
+- [x] `seed_episodes.csv` has 20 rows (15 with a feed; exactly at the gate)
+- [x] D1-D7 recorded in `specs/decisions.md` (D1, D3, D7 decided; D2, D4 interim; D5, D6 are Week 2 decisions; D8 can stay open until Week 4)
 
 ## 4. Weeks 1-6 (milestones)
 
