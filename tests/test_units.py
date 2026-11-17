@@ -199,6 +199,19 @@ class DataFolder(Base):
             paths.ensure_data_home()
         self.assertEqual(os.stat(self.home).st_mode & 0o777, 0o700)
 
+    def test_log_folder_and_file_are_private(self):
+        paths.ensure_data_home()
+        logging_setup.setup_logging(paths.log_dir(), stderr=False)
+        try:
+            self.assertEqual(os.stat(paths.log_dir()).st_mode & 0o777, 0o700)
+            log_file = paths.log_dir() / "podcast-recall.log"
+            self.assertEqual(os.stat(log_file).st_mode & 0o777, 0o600)
+        finally:
+            logger = logging.getLogger("podcast_recall")
+            for handler in list(logger.handlers):
+                handler.close()
+                logger.removeHandler(handler)
+
     def test_database_file_is_private(self):
         paths.ensure_data_home()
         conn = store.connect(paths.db_path(), paths.backup_dir())

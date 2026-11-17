@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sys
 from logging.handlers import RotatingFileHandler
@@ -53,9 +54,11 @@ def setup_logging(log_dir: Path | None, *, stderr: bool = True, level: int = log
     fmt = RedactingFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     if log_dir is not None:
         log_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(log_dir, 0o700)
         file_handler = RotatingFileHandler(
             log_dir / "podcast-recall.log", maxBytes=1_000_000, backupCount=4, encoding="utf-8"
         )
+        os.chmod(log_dir / "podcast-recall.log", 0o600)
         file_handler.setFormatter(fmt)
         setattr(file_handler, _MARK, True)
         logger.addHandler(file_handler)
