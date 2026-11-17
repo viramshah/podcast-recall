@@ -24,6 +24,7 @@ Run these yourself before merging. They use the 20 seed episodes after U2 has ma
 ## Record the results
 - The Whisper model chosen, the real-time factor measured on the full run, and any episodes that failed quality checks, in `decisions.md`.
 - Whether the Hindi or Hinglish episodes stay in the golden set (D11).
+- The comparison of a publisher transcript with Whisper on the same 5-minute section, and the decision on D13.
 
 ## Exit gate
 All eleven manual steps pass and the review checklist in `plan.md` is ticked. Then update `decisions.md` and the roadmap, and merge.

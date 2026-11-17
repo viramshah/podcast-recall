@@ -1,5 +1,5 @@
 {
-  "probed_at": "2026-11-17 23:09:41 UTC",
+  "probed_at": "2026-11-17 23:16:29 UTC",
   "feeds": [
     {
       "name": "Lenny's Podcast",
@@ -17,7 +17,7 @@
       },
       "byfeedid_max5": {
         "status": 200,
-        "seconds": 0.92,
+        "seconds": 0.38,
         "count": 5,
         "newest": "2026-11-15 13:31:28 UTC",
         "oldest": "2026-10-18 12:31:36 UTC",
@@ -92,7 +92,7 @@
       },
       "byfeedid_max1000": {
         "status": 200,
-        "seconds": 0.46,
+        "seconds": 0.49,
         "matches_feed_episodeCount": false,
         "count": 371,
         "newest": "2026-11-15 13:31:28 UTC",
@@ -111,6 +111,24 @@
           5235,
           3513,
           5267
+        ]
+      },
+      "transcripts": {
+        "episodes": 371,
+        "with_transcriptUrl": 351,
+        "with_transcripts_list": 351,
+        "sample_transcriptUrl": "https://api.substack.com/feed/podcast/transcript/224231309/f6e4596b37a2c26be368407658ea668b.vtt",
+        "sample_transcripts": [
+          {
+            "url": "https://api.substack.com/feed/podcast/transcript/224231309/f6e4596b37a2c26be368407658ea668b.vtt",
+            "type": "text/vtt"
+          }
+        ],
+        "feedDead_values": [
+          "0"
+        ],
+        "feedDuplicateOf_values": [
+          "None"
         ]
       },
       "byfeedid_max5000": {
@@ -186,7 +204,7 @@
       },
       "byfeedid_max5": {
         "status": 200,
-        "seconds": 0.76,
+        "seconds": 0.49,
         "count": 5,
         "newest": "2026-11-11 18:00:00 UTC",
         "oldest": "2026-11-02 19:15:00 UTC",
@@ -261,7 +279,7 @@
       },
       "byfeedid_max1000": {
         "status": 200,
-        "seconds": 0.62,
+        "seconds": 0.82,
         "matches_feed_episodeCount": true,
         "count": 396,
         "newest": "2026-11-11 18:00:00 UTC",
@@ -280,6 +298,24 @@
           2911,
           1175,
           3120
+        ]
+      },
+      "transcripts": {
+        "episodes": 396,
+        "with_transcriptUrl": 196,
+        "with_transcripts_list": 196,
+        "sample_transcriptUrl": "https://rss.flightcast.com/transcripts/01M75SABE7AS0F06YAEKTZQ2E1.vtt",
+        "sample_transcripts": [
+          {
+            "url": "https://rss.flightcast.com/transcripts/01M75SABE7AS0F06YAEKTZQ2E1.vtt",
+            "type": "text/vtt"
+          }
+        ],
+        "feedDead_values": [
+          "0"
+        ],
+        "feedDuplicateOf_values": [
+          "None"
         ]
       },
       "byfeedid_max5000": {
@@ -346,7 +382,7 @@
       },
       "byfeedid_max5": {
         "status": 200,
-        "seconds": 0.25,
+        "seconds": 0.52,
         "count": 5,
         "newest": "2026-11-17 15:35:00 UTC",
         "oldest": "2026-11-07 15:35:00 UTC",
@@ -420,7 +456,7 @@
       },
       "byfeedid_max1000": {
         "status": 200,
-        "seconds": 0.7,
+        "seconds": 1.48,
         "matches_feed_episodeCount": false,
         "count": 649,
         "newest": "2026-11-17 15:35:00 UTC",
@@ -439,6 +475,19 @@
           5702,
           8542,
           8485
+        ]
+      },
+      "transcripts": {
+        "episodes": 649,
+        "with_transcriptUrl": 0,
+        "with_transcripts_list": 0,
+        "sample_transcriptUrl": null,
+        "sample_transcripts": null,
+        "feedDead_values": [
+          "0"
+        ],
+        "feedDuplicateOf_values": [
+          "None"
         ]
       },
       "byfeedid_max5000": {

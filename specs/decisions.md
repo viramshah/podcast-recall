@@ -16,6 +16,7 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 | D10 | How user data is stored | (a) One database: shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a) | **Decided** | (a) Episodes and transcripts are stored once and reused. Tokens, library lists, podcast-channel flags and saved findings are per user. "Delete my data" removes the user's tokens and per-user rows; public episode data may stay. This softens the requirements doc's "no transcripts shared between users" to "never exposed or exported to other users". | 2026-11-17 |
 | D11 | Which languages are in scope for v1 | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a) for the gate. Check transcript quality on a Raj Shamani episode in Week 1 and decide whether those 4 seed episodes stay in the golden set. | Open | | |
 | D12 | Where runtime data lives | (a) One folder outside the repo, `~/.podcast-recall/`. (b) Inside the repo's `data/` (git-ignored). | (a) | **Decided** | (a) `~/.podcast-recall/` (override with `PODCAST_RECALL_HOME`), permissions 700, holding the database, logs, audio, transcripts and lock files. The repo's `data/` keeps only the seed list. | 2026-11-17 |
+| D13 | Where transcripts come from | (a) Always run Whisper on the audio. (b) Use the publisher's transcript file when one exists, and run Whisper otherwise. | (b), after comparing one publisher transcript with Whisper on the same 5 minutes | Open | | |
 
 ## Notes per decision
 
@@ -68,3 +69,10 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 - Check in Week 1 (U3 validation step 2): transcript quality on 5 minutes of one episode: _TBD_
 - The search embedding model (`nomic-embed-text`) is English-focused, so Hindi retrieval may be weak: _TBD_
 - Decision after the check: keep those episodes in the golden set, move them to a separate experiment, or replace them: _TBD_
+
+### D13: Transcript source
+- Probe result (2026-11-17): publisher transcript links exist for 351 of 371 Lenny's episodes (95%), 196 of 396 Startup Ideas episodes (49%) and 0 of 649 Figuring Out episodes.
+- For: saves hours of Whisper time, may be more accurate, and needs no audio download or storage for those episodes.
+- Against: publisher files have timed chunks instead of per-word times, formats and quality vary by publisher, and a mix of two sources makes evaluation results harder to compare.
+- Check first: compare one publisher transcript with Whisper on the same 5 minutes, for accuracy of exact quotes and for timing differences: _TBD_
+- Decision: _TBD_

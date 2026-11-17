@@ -11,6 +11,7 @@ Prints a short report and writes data/podcastindex_probe.json (public podcast da
 credentials). About 25 API calls.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -145,6 +146,31 @@ def duration_stats(items: list[dict]) -> dict:
     }
 
 
+def transcript_stats(items: list[dict]) -> dict:
+    """Do publishers offer their own transcripts? (Podcast Index exposes them if so.)"""
+    with_url = [e for e in items if e.get("transcriptUrl")]
+    with_list = [e for e in items if e.get("transcripts")]
+    return {
+        "episodes": len(items),
+        "with_transcriptUrl": len(with_url),
+        "with_transcripts_list": len(with_list),
+        "sample_transcriptUrl": with_url[0].get("transcriptUrl") if with_url else None,
+        "sample_transcripts": with_list[0].get("transcripts") if with_list else None,
+        "feedDead_values": sorted({str(e.get("feedDead")) for e in items}),
+        "feedDuplicateOf_values": sorted({str(e.get("feedDuplicateOf")) for e in items}),
+    }
+
+
+def show_around(feed_id: str, date: str, days: int) -> None:
+    """List the episodes of a feed published within `days` of `date` (YYYY-MM-DD)."""
+    target = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=UTC).timestamp()
+    items = items_of(call("/episodes/byfeedid", id=feed_id, max=1000))
+    window = [e for e in items if abs(e.get("datePublished", 0) - target) <= days * DAY]
+    print(f"Feed {feed_id}: {len(items)} episodes in total, {len(window)} within {days} days of {date}")
+    for e in window:
+        print(f"  {iso(e.get('datePublished'))}  {e.get('duration')} s  {e.get('title')}")
+
+
 def probe_feed(name: str, url: str, needles: list[tuple[str, str]]) -> dict:
     report: dict = {"name": name, "feed_url": url}
 
@@ -187,6 +213,7 @@ def probe_feed(name: str, url: str, needles: list[tuple[str, str]]) -> dict:
         "duplicate_guids": len(full_items) - len({e.get("guid") for e in full_items}),
     }
     report["durations"] = duration_stats(full_items)
+    report["transcripts"] = transcript_stats(full_items)
 
     huge = call("/episodes/byfeedid", id=feed_id, max=5000)
     report["byfeedid_max5000"] = {
@@ -258,6 +285,10 @@ def print_summary(report: dict) -> None:
     d = report["durations"]
     print(f"  durations: types {d['types']}, zero/missing {d['zero_or_missing']}, "
           f"min {d['min_seconds']}, max {d['max_seconds']}, samples {d['samples']}")
+    t = report["transcripts"]
+    print(f"  publisher transcripts: {t['with_transcriptUrl']} of {t['episodes']} episodes have "
+          f"transcriptUrl, {t['with_transcripts_list']} have a transcripts list, "
+          f"sample {t['sample_transcriptUrl']}")
     if "since_60_days_before_newest" in report:
         s = report["since_60_days_before_newest"]
         print(f"  since={s['since']}: returned {s['returned']} (newer-only would be "
@@ -275,6 +306,15 @@ def print_summary(report: dict) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Probe the Podcast Index episode endpoints.")
+    parser.add_argument(
+        "--around", nargs="+", metavar="ARG",
+        help="FEED_ID DATE [DAYS]: list episodes near a date, for example 4458228 2026-03-17 7",
+    )
+    args = parser.parse_args()
+    if args.around:
+        show_around(args.around[0], args.around[1], int(args.around[2]) if len(args.around) > 2 else 7)
+        return
     reports = []
     for name, url, needles in FEEDS:
         report = probe_feed(name, url, needles)

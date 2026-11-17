@@ -11,3 +11,4 @@ data/audio/
 data/transcripts/
 data/clips/
 data/*.txt
+data/compare/

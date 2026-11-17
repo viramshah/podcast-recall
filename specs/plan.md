@@ -53,6 +53,7 @@ Consequences of the web-chat front end (D7, D8):
 | D10 | How user data is stored (**decided Nov 17, 2026**) | (a) Shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a). Transcribe each episode once; tokens, libraries and findings stay per user. |
 | D11 | Which languages are in scope for v1 (**open**) | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a). Check transcript quality on a Raj Shamani episode in Week 1 before deciding about those 4 seed episodes. |
 | D12 | Where runtime data lives (**decided Nov 17, 2026**) | (a) One folder outside the repo, `~/.podcast-recall/`. (b) Inside the repo's `data/`. | (a). Keeps personal library data, transcripts and audio out of git. |
+| D13 | Where transcripts come from (**open**) | (a) Always run Whisper. (b) Use the publisher's transcript file when one exists, Whisper otherwise. | (b), after comparing one publisher transcript with Whisper on the same 5 minutes. About 95% of Lenny's and 49% of Startup Ideas episodes have one; none of Raj Shamani's do. |
 
 ## 3. Week 0: Setup (click-by-click)
 
