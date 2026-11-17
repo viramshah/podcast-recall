@@ -1,0 +1,502 @@
+{
+  "probed_at": "2026-11-17 23:09:41 UTC",
+  "feeds": [
+    {
+      "name": "Lenny's Podcast",
+      "feed_url": "https://api.substack.com/feed/podcast/10845.rss",
+      "byfeedurl": {
+        "status": 200,
+        "error": null
+      },
+      "feed": {
+        "id": 5487204,
+        "title": "Lenny's Podcast: Product | Career | Growth",
+        "episodeCount": 370,
+        "lastUpdateTime": 1794941019,
+        "language": "en"
+      },
+      "byfeedid_max5": {
+        "status": 200,
+        "seconds": 0.92,
+        "count": 5,
+        "newest": "2026-11-15 13:31:28 UTC",
+        "oldest": "2026-10-18 12:31:36 UTC",
+        "order": "newest first",
+        "fields": [
+          "chaptersUrl",
+          "dateCrawled",
+          "datePublished",
+          "datePublishedPretty",
+          "description",
+          "duration",
+          "enclosureLength",
+          "enclosureType",
+          "enclosureUrl",
+          "episode",
+          "episodeType",
+          "explicit",
+          "feedDead",
+          "feedDuplicateOf",
+          "feedId",
+          "feedImage",
+          "feedItunesId",
+          "feedItunesType",
+          "feedLanguage",
+          "feedUrl",
+          "guid",
+          "id",
+          "image",
+          "link",
+          "podcastGuid",
+          "season",
+          "title",
+          "transcriptUrl",
+          "transcripts"
+        ],
+        "first_three": [
+          {
+            "title": "Meta\u2019s Muse: How we launched the most successful consumer product this year | Mona Sarantakos",
+            "guid": "substack:post:224231309",
+            "datePublished": 1794749488,
+            "published_iso": "2026-11-15 13:31:28 UTC",
+            "duration": 5235,
+            "enclosureUrl": "https://pscrb.fm/rss/p/api.substack.com/feed/podcast/224231309/2cdd86d5061669c9821d9a2157b09063.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          },
+          {
+            "title": "Why PMs are suddenly valuable again | Tulsee Doshi (Head of Product, Gemini)",
+            "guid": "substack:post:219474705",
+            "datePublished": 1794144692,
+            "published_iso": "2026-11-08 13:31:32 UTC",
+            "duration": 3513,
+            "enclosureUrl": "https://pscrb.fm/rss/p/api.substack.com/feed/podcast/219474705/120c52772b1e5a4f640d8a9add8ed0ea.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          },
+          {
+            "title": "How a 19-year-old intern built the growth engine behind this $2B AI company | Hector Serrano",
+            "guid": "substack:post:222540764",
+            "datePublished": 1793539896,
+            "published_iso": "2026-11-01 13:31:36 UTC",
+            "duration": 5267,
+            "enclosureUrl": "https://pscrb.fm/rss/p/api.substack.com/feed/podcast/222540764/d0dc1ed1a4c542dd0d1b2678411ac202.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        ]
+      },
+      "byfeedurl_max5": {
+        "status": 200,
+        "same_guids_as_byfeedid": true
+      },
+      "byfeedid_max1000": {
+        "status": 200,
+        "seconds": 0.46,
+        "matches_feed_episodeCount": false,
+        "count": 371,
+        "newest": "2026-11-15 13:31:28 UTC",
+        "oldest": "2022-06-05 16:12:59 UTC",
+        "order": "newest first",
+        "duplicate_guids": 0
+      },
+      "durations": {
+        "types": {
+          "int": 371
+        },
+        "zero_or_missing": 0,
+        "min_seconds": 201,
+        "max_seconds": 9300,
+        "samples": [
+          5235,
+          3513,
+          5267
+        ]
+      },
+      "byfeedid_max5000": {
+        "status": 200,
+        "count": 371,
+        "error": null
+      },
+      "since_60_days_before_newest": {
+        "status": 200,
+        "since": "2026-09-16 13:31:28 UTC",
+        "returned": 9,
+        "expected_if_filtering_newer_only": 9,
+        "count": 9,
+        "newest": "2026-11-15 13:31:28 UTC",
+        "oldest": "2026-09-20 12:32:17 UTC",
+        "order": "newest first"
+      },
+      "before_30_days_before_newest": {
+        "status": 200,
+        "before": "2026-10-16 13:31:28 UTC",
+        "returned": 371,
+        "all_older_than_before": false,
+        "looks_supported": false
+      },
+      "needles": [
+        {
+          "label": "newer seed episode",
+          "text": "lab team",
+          "found": true,
+          "position_in_max1000_list": 5,
+          "episode": {
+            "title": "Why every company now needs to think and operate like a lab team | Josh Woodward (Google Labs, Gemini, AI Studio)",
+            "guid": "substack:post:216810191",
+            "datePublished": 1791721919,
+            "published_iso": "2026-10-11 12:31:59 UTC",
+            "duration": 3731,
+            "enclosureUrl": "https://pscrb.fm/rss/p/api.substack.com/feed/podcast/216810191/b5148fc43510e2906d5e532bff5b6116.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        },
+        {
+          "label": "older seed episode",
+          "text": "enterprise deals",
+          "found": true,
+          "position_in_max1000_list": 12,
+          "episode": {
+            "title": "How to close $100K+ enterprise deals, step by step | Jen Abel",
+            "guid": "substack:post:211488420",
+            "datePublished": 1787488303,
+            "published_iso": "2026-08-23 12:31:43 UTC",
+            "duration": 5097,
+            "enclosureUrl": "https://pscrb.fm/rss/p/api.substack.com/feed/podcast/211488420/7df0a97cc37a6e391091a046a0020be4.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Startup Ideas Podcast (Greg Isenberg)",
+      "feed_url": "https://rss2.flightcast.com/ordbkg8yojpehffas7vr7qpc.xml",
+      "byfeedurl": {
+        "status": 200,
+        "error": null
+      },
+      "feed": {
+        "id": 4458228,
+        "title": "The Startup Ideas Podcast",
+        "episodeCount": 396,
+        "lastUpdateTime": 1794717572,
+        "language": "en"
+      },
+      "byfeedid_max5": {
+        "status": 200,
+        "seconds": 0.76,
+        "count": 5,
+        "newest": "2026-11-11 18:00:00 UTC",
+        "oldest": "2026-11-02 19:15:00 UTC",
+        "order": "newest first",
+        "fields": [
+          "chaptersUrl",
+          "dateCrawled",
+          "datePublished",
+          "datePublishedPretty",
+          "description",
+          "duration",
+          "enclosureLength",
+          "enclosureType",
+          "enclosureUrl",
+          "episode",
+          "episodeType",
+          "explicit",
+          "feedDead",
+          "feedDuplicateOf",
+          "feedId",
+          "feedImage",
+          "feedItunesId",
+          "feedItunesType",
+          "feedLanguage",
+          "feedUrl",
+          "guid",
+          "id",
+          "image",
+          "link",
+          "podcastGuid",
+          "season",
+          "title",
+          "transcriptUrl",
+          "transcripts"
+        ],
+        "first_three": [
+          {
+            "title": "I'm Obsessed With Grok Bot. Here's Why",
+            "guid": "flightcast:01M75SABE7AS0F06YAEKTZQ2E1",
+            "datePublished": 1794420000,
+            "published_iso": "2026-11-11 18:00:00 UTC",
+            "duration": 2911,
+            "enclosureUrl": "https://episode.flightcast.com/01M75SABE7AS0F06YAEKTZQ2E1.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          },
+          {
+            "title": "Claude Fable 5.2: How I\u2019d Make Money With It",
+            "guid": "flightcast:01M7329H19KNND6THD05Q80BFE",
+            "datePublished": 1794329400,
+            "published_iso": "2026-11-10 16:50:00 UTC",
+            "duration": 1175,
+            "enclosureUrl": "https://episode.flightcast.com/01M7329H19KNND6THD05Q80BFE.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          },
+          {
+            "title": "AI Agents are too good at marketing now",
+            "guid": "flightcast:01M70MH40FGMYP7EW7V0JDB376",
+            "datePublished": 1794248100,
+            "published_iso": "2026-11-09 18:15:00 UTC",
+            "duration": 3120,
+            "enclosureUrl": "https://episode.flightcast.com/01M70MH40FGMYP7EW7V0JDB376.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        ]
+      },
+      "byfeedurl_max5": {
+        "status": 200,
+        "same_guids_as_byfeedid": true
+      },
+      "byfeedid_max1000": {
+        "status": 200,
+        "seconds": 0.62,
+        "matches_feed_episodeCount": true,
+        "count": 396,
+        "newest": "2026-11-11 18:00:00 UTC",
+        "oldest": "2021-11-03 16:17:00 UTC",
+        "order": "newest first",
+        "duplicate_guids": 0
+      },
+      "durations": {
+        "types": {
+          "int": 396
+        },
+        "zero_or_missing": 0,
+        "min_seconds": 238,
+        "max_seconds": 6304,
+        "samples": [
+          2911,
+          1175,
+          3120
+        ]
+      },
+      "byfeedid_max5000": {
+        "status": 200,
+        "count": 396,
+        "error": null
+      },
+      "since_60_days_before_newest": {
+        "status": 200,
+        "since": "2026-09-12 18:00:00 UTC",
+        "returned": 21,
+        "expected_if_filtering_newer_only": 21,
+        "count": 21,
+        "newest": "2026-11-11 18:00:00 UTC",
+        "oldest": "2026-09-14 17:30:00 UTC",
+        "order": "newest first"
+      },
+      "before_30_days_before_newest": {
+        "status": 200,
+        "before": "2026-10-12 18:00:00 UTC",
+        "returned": 396,
+        "all_older_than_before": false,
+        "looks_supported": false
+      },
+      "needles": [
+        {
+          "label": "newer seed episode",
+          "text": "too good at marketing",
+          "found": true,
+          "position_in_max1000_list": 2,
+          "episode": {
+            "title": "AI Agents are too good at marketing now",
+            "guid": "flightcast:01M70MH40FGMYP7EW7V0JDB376",
+            "datePublished": 1794248100,
+            "published_iso": "2026-11-09 18:15:00 UTC",
+            "duration": 3120,
+            "enclosureUrl": "https://episode.flightcast.com/01M70MH40FGMYP7EW7V0JDB376.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        },
+        {
+          "label": "older seed episode",
+          "text": "Building AI agents that actually work",
+          "found": false,
+          "position_in_max1000_list": null,
+          "episode": null
+        }
+      ]
+    },
+    {
+      "name": "Figuring Out (Raj Shamani)",
+      "feed_url": "https://anchor.fm/s/f5347ab0/podcast/rss",
+      "byfeedurl": {
+        "status": 200,
+        "error": null
+      },
+      "feed": {
+        "id": 902798,
+        "title": "Figuring Out with Raj Shamani",
+        "episodeCount": 638,
+        "lastUpdateTime": 1794945129,
+        "language": "en-us"
+      },
+      "byfeedid_max5": {
+        "status": 200,
+        "seconds": 0.25,
+        "count": 5,
+        "newest": "2026-11-17 15:35:00 UTC",
+        "oldest": "2026-11-07 15:35:00 UTC",
+        "order": "newest first",
+        "fields": [
+          "chaptersUrl",
+          "dateCrawled",
+          "datePublished",
+          "datePublishedPretty",
+          "description",
+          "duration",
+          "enclosureLength",
+          "enclosureType",
+          "enclosureUrl",
+          "episode",
+          "episodeType",
+          "explicit",
+          "feedDead",
+          "feedDuplicateOf",
+          "feedId",
+          "feedImage",
+          "feedItunesId",
+          "feedItunesType",
+          "feedLanguage",
+          "feedUrl",
+          "guid",
+          "id",
+          "image",
+          "link",
+          "podcastGuid",
+          "season",
+          "title",
+          "transcriptUrl"
+        ],
+        "first_three": [
+          {
+            "title": "Billion-Dollar Tech CEO: How To Make AI Work Like 100 Employees | Sachin Puri | FO589 Raj Shamani",
+            "guid": "552ad698-81b4-4326-9d57-e9476b4bcf94",
+            "datePublished": 1794929700,
+            "published_iso": "2026-11-17 15:35:00 UTC",
+            "duration": 5702,
+            "enclosureUrl": "https://anchor.fm/s/f5347ab0/podcast/play/129617622/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-10-17%2F436964441-44100-2-00f91cca2558f.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          },
+          {
+            "title": "Why Your Communication Makes People Ignore You & How To Fix It | Vinh Giang | FO588 Raj Shamani",
+            "guid": "4986f83b-5dec-48c2-9c33-684a8a6d957f",
+            "datePublished": 1794670501,
+            "published_iso": "2026-11-14 15:35:01 UTC",
+            "duration": 8542,
+            "enclosureUrl": "https://anchor.fm/s/f5347ab0/podcast/play/129431295/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-10-14%2F436722883-44100-2-dc3f3a83470318.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          },
+          {
+            "title": "Build A $100M Brand Using Influencers & Viral Marketing | Kent Yoshimura | FO587 Raj Shamani",
+            "guid": "d2d352a4-16d4-40d6-a334-e2fc28fbcf88",
+            "datePublished": 1794497700,
+            "published_iso": "2026-11-12 15:35:00 UTC",
+            "duration": 8485,
+            "enclosureUrl": "https://anchor.fm/s/f5347ab0/podcast/play/129325938/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-10-12%2F436579241-44100-2-5d361e4ebdfd3.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        ]
+      },
+      "byfeedurl_max5": {
+        "status": 200,
+        "same_guids_as_byfeedid": true
+      },
+      "byfeedid_max1000": {
+        "status": 200,
+        "seconds": 0.7,
+        "matches_feed_episodeCount": false,
+        "count": 649,
+        "newest": "2026-11-17 15:35:00 UTC",
+        "oldest": "2020-03-03 12:00:00 UTC",
+        "order": "newest first",
+        "duplicate_guids": 0
+      },
+      "durations": {
+        "types": {
+          "int": 649
+        },
+        "zero_or_missing": 0,
+        "min_seconds": 54,
+        "max_seconds": 16630,
+        "samples": [
+          5702,
+          8542,
+          8485
+        ]
+      },
+      "byfeedid_max5000": {
+        "status": 200,
+        "count": 649,
+        "error": null
+      },
+      "since_60_days_before_newest": {
+        "status": 200,
+        "since": "2026-09-18 15:35:00 UTC",
+        "returned": 26,
+        "expected_if_filtering_newer_only": 26,
+        "count": 26,
+        "newest": "2026-11-17 15:35:00 UTC",
+        "oldest": "2026-09-19 15:35:00 UTC",
+        "order": "newest first"
+      },
+      "before_30_days_before_newest": {
+        "status": 200,
+        "before": "2026-10-18 15:35:00 UTC",
+        "returned": 649,
+        "all_older_than_before": false,
+        "looks_supported": false
+      },
+      "needles": [
+        {
+          "label": "newer seed episode",
+          "text": "Communication Makes People Ignore",
+          "found": true,
+          "position_in_max1000_list": 1,
+          "episode": {
+            "title": "Why Your Communication Makes People Ignore You & How To Fix It | Vinh Giang | FO588 Raj Shamani",
+            "guid": "4986f83b-5dec-48c2-9c33-684a8a6d957f",
+            "datePublished": 1794670501,
+            "published_iso": "2026-11-14 15:35:01 UTC",
+            "duration": 8542,
+            "enclosureUrl": "https://anchor.fm/s/f5347ab0/podcast/play/129431295/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-10-14%2F436722883-44100-2-dc3f3a83470318.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        },
+        {
+          "label": "older seed episode",
+          "text": "Diet Expert",
+          "found": true,
+          "position_in_max1000_list": 156,
+          "episode": {
+            "title": "Diet Expert: Weight Loss, Calories, Digestion, Sugar & Belly Fats | Pooja Makhija | FO433 Raj Shamani",
+            "guid": "f01afd44-5969-4b70-8a5b-fb49de717e3d",
+            "datePublished": 1763221141,
+            "published_iso": "2025-11-15 15:39:01 UTC",
+            "duration": 4296,
+            "enclosureUrl": "https://anchor.fm/s/f5347ab0/podcast/play/111215152/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-10-15%2F412523280-44100-2-bb2293527fe0f.mp3",
+            "enclosureType": "audio/mpeg",
+            "episodeType": "full"
+          }
+        }
+      ]
+    }
+  ]
+}
