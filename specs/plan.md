@@ -117,7 +117,7 @@ Pick sizes for a 16GB Mac. Use model names that exist in the Ollama library when
 2. Record your reading in `specs/decisions.md` under D1. Given no Premium, this is a v1.1 item.
 
 ### 0.10 Week 0 exit gate
-- [x] Both Ollama models answer; embeddings model works (models pulled; speed numbers not recorded)
+- [x] Both Ollama models answer; embeddings model works (qwen2.5:7b-instruct measured at about 21 tokens/s on 2026-11-17; llama3.1:8b speed not yet measured)
 - [x] Whisper transcript with word timestamps exists (RTF about 0.14-0.24)
 - [x] YouTube subscriptions list prints
 - [x] Podcast Index search returns feeds
