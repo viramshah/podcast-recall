@@ -12,7 +12,7 @@
 9. **Tests.** Queue tests (crash recovery, retries, one worker), quality-check tests, and download tests with a local fake server (404, wrong content type, oversized file). A very short real audio clip tests the Whisper wrapper end to end.
 
 ## Constraints
-- No secrets in code, logs or git. `data/audio/` and `data/transcripts/` stay git-ignored.
+- No secrets in code, logs or git. Audio and transcripts live in the data folder (`~/.podcast-recall/audio/` and `transcripts/`, D12), outside the repo. Use the path helper from U1 (`paths.py`).
 - One transcription at a time. Never run it in parallel with another job.
 - Download only `http` and `https` URLs. Never run downloaded content as code.
 - Write results atomically (temporary name, then rename), so a crash never leaves a half-written transcript that looks finished.

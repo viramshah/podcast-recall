@@ -52,6 +52,7 @@ Consequences of the web-chat front end (D7, D8):
 | D9 | What counts as the YouTube library (**decided Nov 17, 2026**) | (a) Playlists + Liked + recent uploads of channels you mark "podcast". (b) Playlists and Liked only. (c) Everything from every subscription. | (a). Keeps syncs fast and the library focused on podcasts. |
 | D10 | How user data is stored (**decided Nov 17, 2026**) | (a) Shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a). Transcribe each episode once; tokens, libraries and findings stay per user. |
 | D11 | Which languages are in scope for v1 (**open**) | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a). Check transcript quality on a Raj Shamani episode in Week 1 before deciding about those 4 seed episodes. |
+| D12 | Where runtime data lives (**decided Nov 17, 2026**) | (a) One folder outside the repo, `~/.podcast-recall/`. (b) Inside the repo's `data/`. | (a). Keeps personal library data, transcripts and audio out of git. |
 
 ## 3. Week 0: Setup (click-by-click)
 

@@ -15,6 +15,7 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 | D9 | What counts as the YouTube library | (a) Playlists + Liked + recent uploads of channels you mark "podcast". (b) Playlists and Liked only. (c) Everything from every subscription. | (a) | **Decided** | (a) Sync all playlists and Liked videos, plus the latest 50 uploads of channels the user marks as podcast. Subscribed channels are stored but not synced unless marked. | 2026-11-17 |
 | D10 | How user data is stored | (a) One database: shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a) | **Decided** | (a) Episodes and transcripts are stored once and reused. Tokens, library lists, podcast-channel flags and saved findings are per user. "Delete my data" removes the user's tokens and per-user rows; public episode data may stay. This softens the requirements doc's "no transcripts shared between users" to "never exposed or exported to other users". | 2026-11-17 |
 | D11 | Which languages are in scope for v1 | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a) for the gate. Check transcript quality on a Raj Shamani episode in Week 1 and decide whether those 4 seed episodes stay in the golden set. | Open | | |
+| D12 | Where runtime data lives | (a) One folder outside the repo, `~/.podcast-recall/`. (b) Inside the repo's `data/` (git-ignored). | (a) | **Decided** | (a) `~/.podcast-recall/` (override with `PODCAST_RECALL_HOME`), permissions 700, holding the database, logs, audio, transcripts and lock files. The repo's `data/` keeps only the seed list. | 2026-11-17 |
 
 ## Notes per decision
 
@@ -55,6 +56,7 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 - Why: a subscription is a channel, not a video. Reading every upload of every subscribed channel could mean thousands of videos, slow syncs and heavy API quota use, and mostly non-podcast content.
 - What this means: playlists and Liked videos sync in full. Subscribed channels are stored with an `is_podcast` flag (default off). Only marked channels have their latest 50 uploads synced.
 - Consequence: a podcast you only subscribe to will not appear until you mark its channel as a podcast.
+- Refined in the pre-build review: uploads of marked channels are cumulative (they do not drop out as newer ones arrive); only playlists you own are included (the API does not return other people's playlists); a video leaves the library only when no source contains it.
 
 ### D10: Shared episode data (decided 2026-11-17)
 - Why: transcribing an episode is slow. Separate copies per user would repeat that work for every tester who has the same episode.
