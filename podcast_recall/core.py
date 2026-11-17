@@ -1,0 +1,305 @@
+"""The public functions the CLI and (later) the web chat call.
+
+These return result objects and raise typed errors. They never print. Every function takes
+optional keyword arguments (`conn`, `client`, `token_store`, `now`, ...) so tests can inject
+fakes; when they are omitted the real database, Keychain and YouTube client are used.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from contextlib import nullcontext
+
+from podcast_recall import auth, paths, store, sync
+from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, QuotaExceeded
+from podcast_recall.lock import SyncLock
+from podcast_recall.models import (
+    ChannelRow,
+    FetchResult,
+    PurgeResult,
+    RevokeResult,
+    SignInResult,
+    StatusResult,
+    SyncResult,
+)
+from podcast_recall.youtube_client import BATCH_SIZE, GoogleYouTubeClient, YouTubeClient
+
+OWNER = "owner"
+
+
+# ---------------------------------------------------------------------------- helpers
+
+
+def open_db():
+    paths.ensure_data_home()
+    return store.connect(paths.db_path(), paths.backup_dir())
+
+
+class _Db:
+    """Use the injected connection, or open (and close) the real one."""
+
+    def __init__(self, conn) -> None:
+        self._given = conn
+        self.conn = conn
+
+    def __enter__(self):
+        if self.conn is None:
+            self.conn = open_db()
+        return self.conn
+
+    def __exit__(self, *exc_info) -> None:
+        if self._given is None and self.conn is not None:
+            self.conn.close()
+
+
+def _require_user(conn, user_id: str):
+    auth.validate_user_id(user_id)
+    row = store.get_user(conn, user_id)
+    if row is None:
+        raise NotSignedIn(
+            f"No sign-in found for user '{user_id}'. Please sign in again: "
+            f"podcast-recall auth --user {user_id}"
+        )
+    return row
+
+
+def _client_for(user_id: str, token_store: auth.TokenStore | None) -> YouTubeClient:
+    tokens = (token_store or auth.KeychainTokenStore()).get(user_id)
+    if not tokens:
+        raise NotSignedIn(
+            f"No sign-in found for user '{user_id}'. Please sign in again: "
+            f"podcast-recall auth --user {user_id}"
+        )
+    return GoogleYouTubeClient.from_credentials_json(tokens)
+
+
+# ---------------------------------------------------------------------------- sign-in
+
+
+def sign_in(
+    user_id: str = OWNER,
+    force: bool = False,
+    *,
+    conn=None,
+    token_store: auth.TokenStore | None = None,
+    run_flow: Callable[[], auth.FlowResult] | None = None,
+    client_factory: Callable[[str], YouTubeClient] | None = None,
+    now: Callable[[], str] = store.utc_now,
+) -> SignInResult:
+    """Sign in with Google, check the permission and the account, then save the token."""
+    auth.validate_user_id(user_id)
+    tokens = token_store or auth.KeychainTokenStore()
+    with _Db(conn) as db:
+        flow = (run_flow or auth.run_installed_flow)()
+        auth.verify_flow_result(flow)
+        client = (client_factory or GoogleYouTubeClient.from_credentials_json)(flow.credentials_json)
+        me = client.my_channel()
+        existing = store.get_user(db, user_id)
+        cleared = False
+        if existing is not None and existing["youtube_channel_id"] != me.channel_id:
+            if not force:
+                raise ConfigError(
+                    f"User '{user_id}' is linked to the YouTube channel "
+                    f"'{existing['youtube_channel_title']}', but this sign-in is for "
+                    f"'{me.title}'. Use --force to replace it (this clears the saved library "
+                    f"for '{user_id}'), or choose another name with --user."
+                )
+            store.clear_user_data(db, user_id)
+            cleared = True
+        replaced = tokens.get(user_id) is not None
+        tokens.save(user_id, flow.credentials_json)
+        store.upsert_user(db, user_id, me.channel_id, me.title, now())
+    return SignInResult(user_id, me.channel_id, me.title, replaced, cleared)
+
+
+# ---------------------------------------------------------------------------- sync and fetch
+
+
+def sync_library(
+    user_id: str = OWNER,
+    on_progress: Callable[[dict], None] | None = None,
+    *,
+    conn=None,
+    client: YouTubeClient | None = None,
+    token_store: auth.TokenStore | None = None,
+    now: Callable[[], str] = store.utc_now,
+    refresh_days: int | None = None,
+    use_lock: bool = True,
+) -> SyncResult:
+    """Sync playlists, Liked videos and marked channels. One sync at a time per user."""
+    auth.validate_user_id(user_id)
+    days = refresh_days if refresh_days is not None else paths.video_refresh_days()
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        lock = SyncLock(paths.lock_path(user_id)) if use_lock else nullcontext()
+        with lock:
+            api = client or _client_for(user_id, token_store)
+            return sync.run_sync(db, api, user_id, on_progress, now=now, refresh_days=days)
+
+
+def fetch_videos(
+    video_ids: Iterable[str],
+    user_id: str = OWNER,
+    on_progress: Callable[[dict], None] | None = None,
+    *,
+    conn=None,
+    client: YouTubeClient | None = None,
+    token_store: auth.TokenStore | None = None,
+    now: Callable[[], str] = store.utc_now,
+) -> FetchResult:
+    """Fetch details for any video IDs into the shared `videos` table. Never touches a user's
+    library. IDs YouTube does not return are stored as `unavailable`."""
+    ids = list(dict.fromkeys(video_ids))
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        api = client or _client_for(user_id, token_store)
+        before = dict(api.calls)
+        fetched = 0
+        unavailable: list[tuple[str, str]] = []
+        done_chunks = 0
+        reason = None
+        last: Exception | None = None
+        chunks = [ids[i:i + BATCH_SIZE] for i in range(0, len(ids), BATCH_SIZE)]
+        for chunk in chunks:
+            try:
+                infos = api.get_videos(chunk)
+            except (QuotaExceeded, ApiError) as exc:
+                last, reason = exc, str(exc)
+                break
+            missing = store.save_videos(db, chunk, infos, now())
+            fetched += len(infos)
+            unavailable += [(i, store.UNAVAILABLE_REASON) for i in missing]
+            done_chunks += 1
+            if on_progress:
+                on_progress({"stage": "fetch", "done": done_chunks, "total": len(chunks)})
+        if last is not None and done_chunks == 0:
+            raise last
+        delta = {k: v - before.get(k, 0) for k, v in api.calls.items() if v - before.get(k, 0)}
+        return FetchResult(
+            requested=len(ids),
+            fetched=fetched,
+            unavailable=unavailable,
+            calls=delta,
+            estimated_units=sum(delta.values()),
+            partial=last is not None,
+            reason=reason,
+        )
+
+
+# ---------------------------------------------------------------------------- channels
+
+
+def list_channels(
+    user_id: str = OWNER,
+    marked_only: bool = False,
+    refresh: bool = False,
+    *,
+    conn=None,
+    client: YouTubeClient | None = None,
+    token_store: auth.TokenStore | None = None,
+    now: Callable[[], str] = store.utc_now,
+) -> list[ChannelRow]:
+    """Subscribed channels (marked first). Fetches the subscription list from YouTube when none
+    is stored yet, or when `refresh` is true."""
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        rows = store.channel_rows(db, user_id)
+        if refresh or not rows:
+            api = client or _client_for(user_id, token_store)
+            store.apply_subscriptions(db, user_id, api.list_subscriptions(), now())
+            rows = store.channel_rows(db, user_id)
+        return [r for r in rows if r.is_podcast] if marked_only else rows
+
+
+def set_podcast_channel(
+    user_id: str, channel_id: str, is_podcast: bool, *, conn=None
+) -> ChannelRow:
+    """Mark or unmark a subscribed channel as a podcast. Takes effect at the next sync."""
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        row = store.get_user_channel(db, user_id, channel_id)
+        if row is None or not row["subscribed"]:
+            raise ConfigError(
+                f"Channel {channel_id} is not in your subscriptions. Run "
+                "`podcast-recall channels list --refresh` and use an ID from that list."
+            )
+        store.set_podcast_flag(db, user_id, channel_id, is_podcast)
+        for channel in store.channel_rows(db, user_id):
+            if channel.channel_id == channel_id:
+                return channel
+    raise ConfigError(f"Channel {channel_id} could not be found.")  # pragma: no cover
+
+
+# ---------------------------------------------------------------------------- status, revoke, purge
+
+
+def get_status(user_id: str = OWNER, *, conn=None) -> StatusResult:
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        user = _require_user(db, user_id)
+        last = store.last_sync_run(db, user_id)
+        unique, per_source, unavailable = store.library_counts(db, user_id)
+        return StatusResult(
+            user_id=user_id,
+            channel_title=user["youtube_channel_title"],
+            last_run=last,
+            unique_videos=unique,
+            per_source=per_source,
+            unavailable_in_library=unavailable,
+            last_run_units=last["estimated_units"] if last else None,
+        )
+
+
+def revoke(
+    user_id: str = OWNER,
+    *,
+    conn=None,
+    token_store: auth.TokenStore | None = None,
+    http_post: Callable[[str, dict], int] | None = None,
+) -> RevokeResult:
+    """Delete the user's token and per-user rows, and tell Google to revoke the grant. Local
+    deletion happens even if the Google call fails (offline)."""
+    auth.validate_user_id(user_id)
+    tokens = token_store or auth.KeychainTokenStore()
+    with _Db(conn) as db:
+        user = store.get_user(db, user_id)
+        credentials = tokens.get(user_id)
+        if user is None and credentials is None:
+            raise NotSignedIn(f"No sign-in found for user '{user_id}'. Nothing to revoke.")
+        warnings: list[str] = []
+        google_ok = False
+        if credentials:
+            google_ok = (
+                auth.revoke_at_google(credentials, http_post)
+                if http_post
+                else auth.revoke_at_google(credentials)
+            )
+            if not google_ok:
+                warnings.append(
+                    "Google could not be told to revoke access (offline, or already revoked). "
+                    "Remove it yourself at https://myaccount.google.com/connections."
+                )
+        else:
+            warnings.append("No saved sign-in was found, so there was nothing to revoke at Google.")
+        store.delete_user(db, user_id)
+        try:
+            tokens.delete(user_id)
+        except ConfigError as exc:
+            warnings.append(f"{exc} Delete the 'podcast-recall' entry in Keychain Access yourself.")
+    return RevokeResult(google_ok, warnings)
+
+
+def purge_stale_videos(
+    max_age_days: int | None = None, *, conn=None, now: Callable[[], str] = store.utc_now
+):
+    """Delete shared video rows not refreshed within `max_age_days` that no other table refers
+    to. Rows that something still refers to are kept and counted."""
+    days = max_age_days if max_age_days is not None else paths.video_refresh_days()
+    if days < 1:
+        raise ConfigError("The age limit must be at least 1 day.")
+    with _Db(conn) as db:
+        deleted, kept = store.purge(db, store.cutoff(now(), days))
+    return PurgeResult(deleted, kept)
