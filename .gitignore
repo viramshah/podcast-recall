@@ -1,0 +1,10 @@
+client_secret*.json
+token*.json
+.env
+.env.*
+.venv/
+__pycache__/
+.DS_Store
+*.sqlite
+*.db
+data/audio/
