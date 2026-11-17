@@ -14,11 +14,11 @@ Run these yourself before merging. They use the 20 seed episodes after U2 has ma
 | 3 | `podcast-recall transcribe run --limit 2` | Two episodes finish. `transcribe status` shows them as `done`. Audio files are deleted |
 | 4 | Start `transcribe run`, then stop it with Ctrl+C mid-episode, then run it again | The job restarts cleanly. No duplicate transcript. No half-written file |
 | 5 | Start two `transcribe run` commands at the same time | The second exits with a clear message that a worker is already running |
-| 6 | `podcast-recall transcribe run --overnight` for the remaining matched seed episodes | All matched seed episodes (about 15) end as `done`. Total time is noted and reasonable |
+| 6 | `podcast-recall transcribe run --overnight` for the remaining matched seed episodes | Every seed episode whose expected outcome is `matched` (the 15 `y` rows) ends as `done`, or its failure is explained and fixed. Total time is noted and reasonable |
 | 7 | `podcast-recall transcribe status` | Counts by state. Any `failed` job shows its reason |
 | 8 | For 5 episodes, use `transcribe show <episode_id> --at mm:ss` at 3 different times and compare with the audio | Words match what is said, and the timestamp is within about 2 seconds of the real position |
 | 9 | Check the quality flags for all transcripts | Each transcript's length is within about 2% of the audio duration. Any flagged transcript is explained |
-| 10 | Check that `no_feed` seed rows were never downloaded | Their status is `not_indexable`. No audio or transcript exists for them |
+| 10 | Check that the 5 `n` seed rows were never downloaded | `transcribe status` lists them as `not_indexable` (worked out from U2, no job row). No audio or transcript exists for them |
 | 11 | Search the repo and logs for secrets, and `git status` for transcript or audio files | No secrets. Audio and transcripts are not tracked by git |
 
 ## Record the results

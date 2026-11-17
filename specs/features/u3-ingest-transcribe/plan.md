@@ -3,8 +3,8 @@
 ## Approach
 1. **Dependencies.** Reuse `mlx-whisper` (already in `pyproject.toml`) and the HTTP client added in U2. Use `ffprobe` (from the installed `ffmpeg`) to read audio duration, as `scripts/transcribe_test.py` does.
 2. **`jobs.py`.** The queue on SQLite: add, claim, update state, retry with backoff, and recover jobs left in `downloading` or `transcribing` after a crash by returning them to `queued`. A lock file ensures only one worker runs.
-3. **`download.py`.** Download with a timeout and a size limit, check the content type, write to a temporary name and rename on success. Delete partial files on failure.
-4. **`transcribe.py`.** Wraps `mlx-whisper` (model name from configuration) and returns a structure of segments and words. Builds on `scripts/transcribe_test.py`. No database access.
+3. **`download.py`.** Download with the limits in the requirements (600 MB, 15 s connect, 30 min total, 5 redirects), check the content type, write to a temporary name and rename on success. Delete partial files on failure. Resolve the host after each redirect and refuse loopback, link-local and private addresses.
+4. **`transcribe.py`.** Wraps `mlx-whisper` (model name from configuration) and returns a structure of segments and words. Starts from `scripts/transcribe_test.py`, but the output format is new: that script writes a flat word list, while U3 stores segments that each contain words. No database access.
 5. **`quality.py`.** Pure functions for the quality checks (duration match, words per minute, gaps, language). Easy to unit test.
 6. **`transcripts.py`.** Writes the JSON file atomically, then the `transcripts` row. Reads for `get_transcript`.
 7. **`store.py`.** Add `jobs` and `transcripts` tables, with a migration.
@@ -25,6 +25,7 @@
 - [ ] Every transcript has per-word start and end times, model name, language and duration
 - [ ] Quality flags are stored, and a failed check marks `needs_review` instead of passing silently
 - [ ] Audio is deleted after success unless the keep flag is set
-- [ ] Unmatched and no-feed videos are never downloaded
+- [ ] Unmatched, no-feed and unconfirmed `needs_review` videos are never downloaded, and appear as `not_indexable` without a job row
+- [ ] A download that redirects to `localhost` or a private address is refused (tested with a fake server)
 - [ ] No secrets or full transcripts in git or logs
 - [ ] Nothing added beyond the spec (no chunking, no search, no diarization)

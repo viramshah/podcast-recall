@@ -49,6 +49,7 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 - Ask Qualtrics IT whether exposing a local service from your work Mac through a tunnel is allowed: _TBD_
 - A tunnel needs login in front (Cloudflare Access), and testers need a Web application OAuth client with a redirect URL: _TBD_
 - Fallbacks: testers run it on their own Macs, or screen-share sessions.
+- Copyright: if testers reach the app through a tunnel, the app must show short quotes plus links only and never serve full transcripts, as in the requirements doc's export rule: _TBD_
 
 ### D9: Library scope (decided 2026-11-17)
 - Why: a subscription is a channel, not a video. Reading every upload of every subscribed channel could mean thousands of videos, slow syncs and heavy API quota use, and mostly non-podcast content.

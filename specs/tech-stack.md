@@ -29,7 +29,10 @@ Change an entry only by editing this file and recording why in `decisions.md`.
 - The web chat binds to `127.0.0.1` and is never exposed to a network without login in front.
 - Claude and other hosted LLMs are not used in the product. The answer and judge models run in Ollama.
 - Episodes and transcripts are stored once and shared (public publisher content). Tokens, library lists, podcast-channel flags and findings are per user and carry a `user_id` (D10).
-- `search.list` is never called, because it costs 100 YouTube quota units per call.
+- `search.list` is never called. It is not needed, and Google's quota page gives it its own small daily allowance (checked twice on 2026-11-17; an earlier version of this file wrongly said 100 units per call).
+- Podcast Index credentials come from the environment variables `PODCASTINDEX_KEY` and `PODCASTINDEX_SECRET`, optionally loaded from `~/.podcast-recall/podcastindex.env` (permissions 600). They are not stored in Keychain, and are never logged or committed. Google OAuth tokens are stored in Keychain.
+- Database changes are numbered SQL migration files in `podcast_recall/migrations/`, tracked by a `schema_version` table. Each unit adds its own.
+- Downloads from feeds refuse loopback, link-local and private addresses, including after redirects.
 - No secrets in code, logs or git.
 - No Spotify or other platform content is sent to an LLM.
 - Exports hold short quotes plus links, never full transcripts.

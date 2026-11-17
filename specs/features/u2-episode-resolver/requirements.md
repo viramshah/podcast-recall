@@ -8,6 +8,7 @@ Branch: `feature/u2-episode-resolver`. Depends on U1 (`videos` table with title,
 - The matched episode gives U3 what it needs: audio URL, feed episode ID (GUID), feed title, publish date and duration.
 - Both platform IDs are stored so links can be built later: the YouTube video ID, and (v1.1) the Spotify episode ID.
 - **Week 1 target:** at least 95% of the 20 seed episodes are correctly resolved (19 of 20), checked by hand. **A wrong result with status `matched` counts as a defect to fix, not as one of the allowed misses**, because it would cite the wrong audio.
+- **What "correct" means for the seed list.** The expected outcome comes from the `has_rss` column of `data/seed_episodes.csv`. A `y` row is correct when it is `matched` to the right feed episode. An `n` row is correct when it is **not** `matched`: `no_feed` if its channel has no feed, or `unmatched` if the channel has a feed but that episode is not in it (for example the Raj Shamani "Diet Expert" row and the Dan Martell row). With 15 `y` rows, one missed `y` row still leaves 19 of 20 correct, but it also leaves only 14 episodes for U3.
 - The 100-episode hand check from the requirements doc is a Week 4 task.
 
 ## Why this is harder than it looks (learned in Week 0)
@@ -18,11 +19,12 @@ Branch: `feature/u2-episode-resolver`. Depends on U1 (`videos` table with title,
 
 ## Scope
 1. **Find the feed once per channel.** For each YouTube channel in the library, search Podcast Index for candidate feeds and show the top few. The PM confirms the right one (or "none") once. The choice is stored as the channel's feed and is reused for every later video from that channel.
-2. **Match each video to an episode within that feed.** Fetch recent episodes of the feed (Podcast Index episode endpoints, with a fallback to parsing the RSS), then score each candidate against the video on title similarity, publish-date closeness and duration closeness.
+2. **Match each video to an episode within that feed.** Fetch the feed's episodes around the video's publish date (Podcast Index episode endpoints `episodes/byfeedid` or `episodes/byfeedurl`, with a fallback to parsing the RSS). **How these endpoints page and sort, and what fields they return, has not been verified**: the plan starts with a probe of the real endpoints, and the paging design follows from what it finds. Then score each candidate against the video on title similarity, publish-date closeness and duration closeness.
 3. **Store the result** with the score, the status, the per-signal scores and the duration difference in seconds (used later to measure timestamp drift).
 4. **Handle clips and non-episodes.** A video far shorter than every candidate, or with no candidate above the review threshold, is `unmatched`.
 5. **CLI commands:** `resolve feeds` (choose feeds for channels), `resolve run [--seed]`, `resolve review` (list `needs_review` and `unmatched` items), `resolve confirm <video_id> <episode_id>` and `resolve reject <video_id>`. `resolve run --seed` also writes `data/seed_resolver_check.csv` with one row per seed video (video ID, title, best episode title, status, score, and an empty `correct (y/n)` column for the PM to fill in).
 6. **Core functions** (`core.py`, no printing): `find_feed_candidates(channel_id)`, `set_channel_feed(channel_id, feed_id_or_none)`, `resolve_videos(video_ids)` and `confirm_match(video_id, episode_id)`.
+7. **Credentials.** The Podcast Index key and secret come from the environment variables `PODCASTINDEX_KEY` and `PODCASTINDEX_SECRET`. The CLI also loads `~/.podcast-recall/podcastindex.env` if it exists, as in Week 0. The file must have permissions 600, and the values are never logged or printed.
 
 ## Starting thresholds (to be tuned on the seed list, not guessed)
 | Status | Rule |
@@ -34,10 +36,14 @@ Branch: `feature/u2-episode-resolver`. Depends on U1 (`videos` table with title,
 
 Signals and starting weights: title similarity 0.5, publish date within 2 days 0.3, duration within the larger of 10% or 3 minutes 0.2. Record the final values in `decisions.md` after the seed run.
 
+**These starting values are untested and may not work.** With title worth 0.5, an episode whose title differs a lot (the Lenny's "Muse" example) cannot reach 0.85 on date and duration alone, because those two signals add up to only 0.5. Tuning must make seed pairs with different titles but matching date and duration reach a useful result: at least the correct episode as the top candidate, with status `matched` or `needs_review`. Record which, and why, in `decisions.md`.
+
+**Missing duration.** Feeds give duration as seconds, as `HH:MM:SS` text, as 0, or not at all. Parse the first two forms. Treat 0 or missing as "no duration signal" and divide the weights among the signals that are available, so such feeds are not pushed down to `needs_review` for lack of data.
+
 ## Edge cases
 - Channel with no feed (D2): mark `no_feed`, never try to guess an episode.
 - The same episode uploaded twice to YouTube: both videos map to the same feed episode.
-- A feed too large to download whole (the Lenny's feed is several MB): do not load the whole feed. Use the episode endpoints and page by date.
+- A feed too large to download whole (the Lenny's feed is several MB): do not load the whole feed. Use the episode endpoints with a date filter and a cap on the number of results, as the probe shows is possible. A video older than the newest results the endpoint will return must still be findable.
 - Podcast Index unavailable or rate-limited: stop with a clear message, keep earlier results.
 - A feed episode removed later: keep the stored match, and flag it when U3 cannot download the audio.
 
@@ -53,4 +59,4 @@ Shared tables (D10): `feeds` (feed ID, title, URL), `channel_feeds` (channel to 
 ## Open questions for Claude Code to raise before coding
 - Which fuzzy-matching library to use, and how titles are normalised (case, punctuation, guest-name suffixes after a pipe).
 - How Podcast Index paging works for long feeds, and its rate limits.
-- Whether `needs_review` results should block U3 or let it proceed.
+- (Resolved) `needs_review` matches are not transcribed until the PM confirms them with `resolve confirm`. See U3 for the rule.

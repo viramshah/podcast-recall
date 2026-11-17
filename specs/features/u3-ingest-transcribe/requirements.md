@@ -11,8 +11,9 @@ Branch: `feature/u3-ingest-transcribe`. Depends on U2 (`episodes` table with aud
 - Cost: $0. Transcribing 1 hour of audio overnight is acceptable. Measured in Week 0: about 0.14 to 0.24 seconds of compute per second of audio with the small model.
 
 ## Scope
-1. **Queue.** A `jobs` table with one row per episode and a state: `queued`, `downloading`, `transcribing`, `done`, `failed`, or `not_indexable`. Each job records attempts, last error and timestamps.
-2. **Download.** Fetch the audio URL from the feed. Check the response is audio, enforce a size limit and a timeout, and store the file under `data/audio/` (git-ignored). Follow redirects safely. Only `http` and `https` URLs.
+1. **Queue.** A `jobs` table with one row per episode and a state: `queued`, `downloading`, `transcribing`, `done` or `failed`. Each job records attempts, last error and timestamps. `not_indexable` is **not** a job state: it is worked out from U2's `episode_matches` (a video with status `no_feed` or `unmatched`, or `needs_review` that has not been confirmed) and shown by `transcribe status`.
+   **Who enqueues.** `transcribe run` first enqueues every episode that has a match with status `matched`, or `needs_review` with `reviewed = 1` (confirmed by the PM with `resolve confirm`), and that has no job yet. It never enqueues anything else. It never re-enqueues a `done` job.
+2. **Download.** Fetch the audio URL from the feed. Check the response is audio and store the file under `data/audio/` (git-ignored). Limits: maximum file size 600 MB, connect timeout 15 seconds, total time 30 minutes, at most 5 redirects. Only `http` and `https` URLs. **After every redirect, refuse addresses that point to this Mac or a private network** (loopback such as `127.0.0.1` and `localhost`, link-local, and private ranges), so a malicious feed cannot make the app call Ollama or another local service.
 3. **Transcribe.** Use `mlx-whisper` with word timestamps. Run one transcription at a time, so it never competes with Ollama for memory on a 16GB Mac.
 4. **Store the result.** One JSON file per episode under `data/transcripts/` with: episode ID, model name and version, detected language, audio duration, and a list of segments, each with words (text, start, end). Also a `transcripts` row pointing to the file, with status and quality flags.
 5. **Quality checks** on every transcript, recorded as flags: transcript length within about 2% of the audio duration, a plausible number of words per minute, no long silent gaps in timestamps, and the detected language. A failed check marks the transcript `needs_review` instead of silently trusting it.
@@ -22,7 +23,7 @@ Branch: `feature/u3-ingest-transcribe`. Depends on U2 (`episodes` table with aud
 9. **Core functions** (`core.py`, no printing): `enqueue_episodes(episode_ids)`, `run_queue(limit)` and `get_transcript(episode_id)`.
 
 ## Edge cases
-- `no_feed` or unmatched videos: never enqueued. They show as `not_indexable` (D2).
+- `no_feed`, `unmatched` and unconfirmed `needs_review` videos: never enqueued. They show as `not_indexable` in `transcribe status` (D2), worked out from U2's table, with no job row.
 - Audio URL gone (404) or behind a login: mark `failed` with a clear reason.
 - Very long episodes (3 hours or more): allowed, but flagged, because they take longer.
 - Mac sleeps or the process is killed mid-job: on restart the job returns to `queued` and starts again cleanly.
