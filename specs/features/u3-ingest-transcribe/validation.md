@@ -20,6 +20,9 @@ Run these yourself before merging. They use the 20 seed episodes after U2 has ma
 | 9 | Check the quality flags for all transcripts | Each transcript's length is within about 2% of the audio duration. Any flagged transcript is explained |
 | 10 | Check that the 5 `n` seed rows were never downloaded | `transcribe status` lists them as `not_indexable` (worked out from U2, no job row). No audio or transcript exists for them |
 | 11 | Search the repo and logs for secrets, and `git status` for transcript or audio files | No secrets. Audio and transcripts are not tracked by git |
+| 12 | Run `transcribe run` on a Lenny's episode that has a transcript link | The transcript has `source = publisher` and `chunk` timing, no audio was downloaded, and cue times look right when spot-checked at 3 points |
+| 13 | Run `transcribe run` on a Raj Shamani episode (no transcript link) | The transcript has `source = whisper` and `word` timing. Audio was downloaded, transcribed and then deleted |
+| 14 | Point one episode at a broken transcript link (a copy of the test data) | It falls back to Whisper and records the reason |
 
 ## Record the results
 - The Whisper model chosen, the real-time factor measured on the full run, and any episodes that failed quality checks, in `decisions.md`.
@@ -27,4 +30,4 @@ Run these yourself before merging. They use the 20 seed episodes after U2 has ma
 - The comparison of a publisher transcript with Whisper on the same 5-minute section, and the decision on D13.
 
 ## Exit gate
-All eleven manual steps pass and the review checklist in `plan.md` is ticked. Then update `decisions.md` and the roadmap, and merge.
+All fourteen manual steps pass and the review checklist in `plan.md` is ticked. Then update `decisions.md` and the roadmap, and merge.

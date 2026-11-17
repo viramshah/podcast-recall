@@ -30,14 +30,15 @@ Branch: `feature/u3-ingest-transcribe`. Depends on U2 (`episodes` table with aud
 - Disk nearly full: stop with a clear message before starting a download.
 - Two copies of the same episode matched from different videos: transcribe once.
 
-## Proposed: use publisher transcripts when they exist (decision D13, open)
-The Podcast Index probe on 2026-11-17 found that many publishers supply their own transcript file: 351 of 371 Lenny's episodes (95%), 196 of 396 Startup Ideas episodes (49%), and none of the 649 Figuring Out episodes. If adopted:
+## Publisher transcripts first, Whisper as the fallback (decision D13, decided 2026-11-17)
+The Podcast Index probe on 2026-11-17 found that many publishers supply their own transcript file: 351 of 371 Lenny's episodes (95%), 196 of 396 Startup Ideas episodes (49%), and none of the 649 Figuring Out episodes. The approach:
 - Before downloading audio, check the episode's `transcriptUrl`. If there is one, download that file (a `.vtt` file of timed text chunks) and store it as the episode's transcript, with `source = publisher`. Skip the audio download and Whisper.
 - If there is no transcript link, or it fails to download or to parse, fall back to audio and Whisper, with `source = whisper`.
 - Publisher transcripts have timed chunks, not per-word times. Record the timing detail (`chunk` or `word`) on each transcript so later units know what precision they have.
 - Download rules are the same as for audio: only `http` and `https`, refuse private addresses after redirects, a size limit and a timeout.
-- Before adopting, compare one publisher transcript with a Whisper transcript of the same 5-minute section: word accuracy on exact quotes, and how far the timings differ.
-Until D13 is decided, build only the Whisper path.
+- Quality checks for a publisher transcript: it is not empty, its last cue ends within 5% of the feed's stated duration, and its words per minute fall in a plausible range. A failed check falls back to Whisper and records why.
+- During validation, compare one publisher transcript with a Whisper transcript of the same 5-minute section (`scripts/compare_transcripts.py`): word accuracy on exact quotes, and how far the timings differ. If publisher transcripts prove too inaccurate or too coarse, revisit D13.
+Build both paths. The download rules, the job queue, retries and the stored fields are the same for both, and every transcript records its `source` (`publisher` or `whisper`) and its timing detail (`chunk` or `word`).
 
 ## Risks to check in Week 1
 - **Language (D11).** As far as I know, Raj Shamani's "Figuring Out" podcast (4 of the 20 seed episodes) is largely in Hindi or Hinglish. The small English-tuned setup may transcribe it poorly, and the embedding model used for search is English-focused. Transcribe 5 minutes of one of those episodes early and judge the quality before deciding whether they stay in the golden set.

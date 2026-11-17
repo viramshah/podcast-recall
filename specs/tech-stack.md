@@ -5,7 +5,7 @@ Change an entry only by editing this file and recording why in `decisions.md`.
 | Layer | Choice | Cost | Why |
 |---|---|---|---|
 | Language and tooling | Python 3.12, `uv`, `pytest`, `ruff` | $0 | Fits the ML libraries and FastAPI |
-| Transcription | `mlx-whisper` (fallback `whisper.cpp`), local, word timestamps | $0 | Runs on Apple Silicon; timestamps power citations |
+| Transcription | The publisher's transcript file when one exists (D13), otherwise `mlx-whisper` (fallback `whisper.cpp`), local, word timestamps | $0 | Saves hours of compute for episodes that have one; timestamps power citations |
 | Embeddings | `nomic-embed-text` via Ollama (or a `bge` model via sentence-transformers) | $0 | Local, small |
 | Reranker | Open reranker model, local | $0 | Improves recall@5 |
 | Answer LLM | One 7-9B instruct model via Ollama | $0 | Sized for 16GB RAM |

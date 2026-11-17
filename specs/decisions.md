@@ -16,7 +16,7 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 | D10 | How user data is stored | (a) One database: shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a) | **Decided** | (a) Episodes and transcripts are stored once and reused. Tokens, library lists, podcast-channel flags and saved findings are per user. "Delete my data" removes the user's tokens and per-user rows; public episode data may stay. This softens the requirements doc's "no transcripts shared between users" to "never exposed or exported to other users". | 2026-11-17 |
 | D11 | Which languages are in scope for v1 | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a) for the gate. Check transcript quality on a Raj Shamani episode in Week 1 and decide whether those 4 seed episodes stay in the golden set. | Open | | |
 | D12 | Where runtime data lives | (a) One folder outside the repo, `~/.podcast-recall/`. (b) Inside the repo's `data/` (git-ignored). | (a) | **Decided** | (a) `~/.podcast-recall/` (override with `PODCAST_RECALL_HOME`), permissions 700, holding the database, logs, audio, transcripts and lock files. The repo's `data/` keeps only the seed list. | 2026-11-17 |
-| D13 | Where transcripts come from | (a) Always run Whisper on the audio. (b) Use the publisher's transcript file when one exists, and run Whisper otherwise. | (b), after comparing one publisher transcript with Whisper on the same 5 minutes | Open | | |
+| D13 | Where transcripts come from | (a) Always run Whisper on the audio. (b) Use the publisher's transcript file when one exists, and run Whisper otherwise. | (b), after comparing one publisher transcript with Whisper on the same 5 minutes | **Decided** | (b) Publisher transcript first, Whisper as the fallback. Decided by the PM before the side-by-side comparison was run, so the comparison stays as a check during U3 validation. | 2026-11-17 |
 
 ## Notes per decision
 
@@ -75,4 +75,5 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 - For: saves hours of Whisper time, may be more accurate, and needs no audio download or storage for those episodes.
 - Against: publisher files have timed chunks instead of per-word times, formats and quality vary by publisher, and a mix of two sources makes evaluation results harder to compare.
 - Check first: compare one publisher transcript with Whisper on the same 5 minutes, for accuracy of exact quotes and for timing differences: _TBD_
-- Decision: _TBD_
+- Decision (2026-11-17, PM): publisher transcript first. Whisper is the fallback when an episode has no transcript link, or the file fails to download, parse or pass the quality checks.
+- Consequences: U2 must keep each episode's transcript link. U3 builds both paths and records the `source` and the timing detail (`chunk` or `word`) of every transcript. Raj Shamani's episodes (no publisher transcripts) always go through Whisper. If the comparison shows publisher transcripts are too inaccurate or too coarse in timing, revisit this decision.
