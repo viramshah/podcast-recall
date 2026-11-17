@@ -28,6 +28,8 @@ Change an entry only by editing this file and recording why in `decisions.md`.
 - Only the `youtube.readonly` OAuth scope.
 - The web chat binds to `127.0.0.1` and is never exposed to a network without login in front.
 - Claude and other hosted LLMs are not used in the product. The answer and judge models run in Ollama.
+- Episodes and transcripts are stored once and shared (public publisher content). Tokens, library lists, podcast-channel flags and findings are per user and carry a `user_id` (D10).
+- `search.list` is never called, because it costs 100 YouTube quota units per call.
 - No secrets in code, logs or git.
 - No Spotify or other platform content is sent to an LLM.
 - Exports hold short quotes plus links, never full transcripts.

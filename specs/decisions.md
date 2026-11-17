@@ -12,6 +12,9 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 | D6 | Who second-labels 30 golden items (20 in Week 2) | A tester, colleague or friend who listens | Name a person before Week 2; about 3 hrs | Open | | |
 | D7 | Front end | (a) Ask IT for an MCP exception. (b) Personal machine and account. (c) Local web chat plus CLI on the same core code. | (c) | **Decided** | (c) Local web chat (FastAPI, localhost) plus a CLI over a shared core library. MCP is deferred to an optional thin adapter. | 2026-11-16 |
 | D8 | How testers reach the app | (a) Cloudflare Tunnel plus Cloudflare Access (login by email). (b) Testers run it on their own Macs. (c) Screen-share sessions only. | Decide by Week 4, after asking IT whether exposing a service from the work Mac is allowed. Never expose without login. | Open | | |
+| D9 | What counts as the YouTube library | (a) Playlists + Liked + recent uploads of channels you mark "podcast". (b) Playlists and Liked only. (c) Everything from every subscription. | (a) | **Decided** | (a) Sync all playlists and Liked videos, plus the latest 50 uploads of channels the user marks as podcast. Subscribed channels are stored but not synced unless marked. | 2026-11-17 |
+| D10 | How user data is stored | (a) One database: shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a) | **Decided** | (a) Episodes and transcripts are stored once and reused. Tokens, library lists, podcast-channel flags and saved findings are per user. "Delete my data" removes the user's tokens and per-user rows; public episode data may stay. This softens the requirements doc's "no transcripts shared between users" to "never exposed or exported to other users". | 2026-11-17 |
+| D11 | Which languages are in scope for v1 | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a) for the gate. Check transcript quality on a Raj Shamani episode in Week 1 and decide whether those 4 seed episodes stay in the golden set. | Open | | |
 
 ## Notes per decision
 
@@ -46,3 +49,19 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 - Ask Qualtrics IT whether exposing a local service from your work Mac through a tunnel is allowed: _TBD_
 - A tunnel needs login in front (Cloudflare Access), and testers need a Web application OAuth client with a redirect URL: _TBD_
 - Fallbacks: testers run it on their own Macs, or screen-share sessions.
+
+### D9: Library scope (decided 2026-11-17)
+- Why: a subscription is a channel, not a video. Reading every upload of every subscribed channel could mean thousands of videos, slow syncs and heavy API quota use, and mostly non-podcast content.
+- What this means: playlists and Liked videos sync in full. Subscribed channels are stored with an `is_podcast` flag (default off). Only marked channels have their latest 50 uploads synced.
+- Consequence: a podcast you only subscribe to will not appear until you mark its channel as a podcast.
+
+### D10: Shared episode data (decided 2026-11-17)
+- Why: transcribing an episode is slow. Separate copies per user would repeat that work for every tester who has the same episode.
+- What stays private: tokens, library lists, podcast-channel flags and saved findings. Episode transcripts come from public publisher feeds.
+- To do: read YouTube's API developer policies on stored-data limits and deletion after revocation, and record the result here: _TBD_
+
+### D11: Languages
+- As far as I know, Raj Shamani's "Figuring Out" is largely Hindi or Hinglish, and 4 of the 20 seed episodes are from it. Verify by listening: _TBD_
+- Check in Week 1 (U3 validation step 2): transcript quality on 5 minutes of one episode: _TBD_
+- The search embedding model (`nomic-embed-text`) is English-focused, so Hindi retrieval may be weak: _TBD_
+- Decision after the check: keep those episodes in the golden set, move them to a separate experiment, or replace them: _TBD_

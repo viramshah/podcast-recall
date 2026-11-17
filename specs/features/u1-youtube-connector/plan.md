@@ -1,23 +1,29 @@
-# U1: YouTube Library Connector, Plan
+# U1: YouTube Library Connector, Plan (v2, 2026-11-17)
 
 ## Approach
-1. Project skeleton: Python 3.12, `uv`, package `podcast_recall/`, `pytest`, `ruff`, and a `make test` target.
-2. `auth.py`: Google OAuth installed-app flow using `google-auth-oauthlib`. Read `client_secret.json` from a path given by an env var. Store the refresh token in macOS Keychain (via `keyring`).
-3. `youtube_client.py`: thin wrapper over the YouTube Data API with pagination, retry with backoff, and a quota counter. No calls from anywhere else.
-4. `sync.py`: first sync pulls everything; later syncs use stored etags and the newest `publishedAt` per source to fetch only changes. Idempotent: running twice makes no duplicates.
-5. `store.py`: SQLite access and migrations.
-6. `cli.py`: commands `auth`, `sync`, `status`, `revoke`.
-7. Unit tests with the API mocked. One manual integration test against your real account.
+1. **Project set-up.** Python 3.12, `uv`. Change `pyproject.toml`: turn on packaging (`package = true`), add a `podcast-recall` command entry, and add `pytest` and `ruff` as dev dependencies. Add a `Makefile` with `test` and `lint` targets.
+2. **`podcast_recall/core.py`.** The public functions the web chat and CLI both call: `sync_library(user_id)`, `fetch_videos(video_ids)`, `list_channels(user_id)`, `set_podcast_channel(user_id, channel_id, is_podcast)`, `revoke(user_id)`. No printing and no CLI logic here.
+3. **`auth.py`.** Google OAuth installed-app flow using `google-auth-oauthlib`. Reads the client secret path from `CLIENT_SECRET_PATH` (default `~/.podcast-recall/client_secret.json`, matching the Week 0 scripts). Tokens go through a `TokenStore` interface. The first implementation stores the refresh token in macOS Keychain (via `keyring`), keyed by user. `revoke` also calls Google's revoke endpoint.
+4. **`youtube_client.py`.** The only place that calls the API. Pagination, retry with backoff, a quota counter, and a hard block on `search.list`.
+5. **`sync.py`.** For each source (every playlist, Liked videos, and the latest 50 uploads of each podcast channel): list all video IDs, compare with stored library items, add new ones and remove missing ones, then call `videos.list` only for IDs not yet in the `videos` table. Skip deleted and private placeholders and count them. Idempotent.
+6. **`store.py`.** SQLite access and migrations. Shared `videos` and `channels`; per-user `users`, `library_items`, `user_channels`.
+7. **`cli.py`.** Thin wrapper over `core.py` with the commands in the requirements.
+8. **Tests.** Unit tests with the YouTube API mocked, including deleted and private placeholders, removed items, quota exceeded and an expired token. One manual test against your real account.
 
 ## Constraints
 - No secrets in code, logs, test fixtures or git. `client_secret.json` and token files are in `.gitignore`.
 - Only the read-only scope. Fail if a broader scope is requested.
-- Every API call goes through `youtube_client.py`.
+- Every API call goes through `youtube_client.py`. `search.list` is never called.
+- `core.py` has no user-facing printing, so the web chat can reuse it.
+- Every per-user table has `user_id`, even though v1 starts with one user.
 
 ## Review checklist (PM)
 - [ ] No tokens or secrets in the diff or logs
 - [ ] Scope string is exactly `youtube.readonly`
-- [ ] Running `sync` twice gives identical row counts
-- [ ] `revoke` leaves no rows and no Keychain entry for that user
-- [ ] Tests fail if you break pagination or incremental logic
-- [ ] Nothing was added beyond the spec (no Spotify, no transcripts)
+- [ ] No call to `search.list` anywhere
+- [ ] Running `sync` twice gives identical row counts, and the second run makes no `videos.list` calls for unchanged videos
+- [ ] Removing a video from a playlist and syncing removes it from the library
+- [ ] `revoke` leaves no rows and no Keychain entry for that user, and calls Google's revoke endpoint
+- [ ] `sync_library` and `fetch_videos` live in `core.py`, and the CLI only calls them
+- [ ] Tests fail if you break pagination, the ID comparison or placeholder handling
+- [ ] Nothing was added beyond the spec (no Spotify, no transcripts, no web sign-in)

@@ -49,6 +49,9 @@ Consequences of the web-chat front end (D7, D8):
 | D6 | Who second-labels 30 golden items | A tester, a colleague, or a friend who listens | Pick a named person before Week 2. Needs about 3 hrs. |
 | D7 | Front end (**decided Nov 16, 2026**) | (a) Ask IT for an MCP exception. (b) Personal machine and account. (c) Local web chat plus CLI on the same core code. | (c). MCP is blocked by policy, and (c) removes the dependency on any Claude client. MCP can be added later as a thin adapter. |
 | D8 | How testers reach the app (**open**) | (a) Cloudflare Tunnel plus Cloudflare Access (login by email). (b) Testers run it on their own Macs. (c) Screen-share sessions only. | Decide by Week 4. Ask Qualtrics IT whether exposing a service from your work Mac is allowed. If not, use (b) or (c). Never expose the app without login. |
+| D9 | What counts as the YouTube library (**decided Nov 17, 2026**) | (a) Playlists + Liked + recent uploads of channels you mark "podcast". (b) Playlists and Liked only. (c) Everything from every subscription. | (a). Keeps syncs fast and the library focused on podcasts. |
+| D10 | How user data is stored (**decided Nov 17, 2026**) | (a) Shared episodes and transcripts, per-user library. (b) Fully separate data per user. | (a). Transcribe each episode once; tokens, libraries and findings stay per user. |
+| D11 | Which languages are in scope for v1 (**open**) | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a). Check transcript quality on a Raj Shamani episode in Week 1 before deciding about those 4 seed episodes. |
 
 ## 3. Week 0: Setup (click-by-click)
 
