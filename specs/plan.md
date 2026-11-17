@@ -2,6 +2,8 @@
 
 Source: `Podcast_Recall_Requirements.docx` v0.2 (Nov 16, 2026). This plan turns it into steps a semi-technical PM can run with Claude Code as the builder.
 
+**Revision (Nov 16, 2026): the front end is a local web chat plus a command-line tool, not an MCP server.** Qualtrics policy blocks adding MCP servers (Claude Code reports "not allowed by enterprise policy"). The requirements doc still describes U5 as an MCP server and assumes Claude Desktop. Where the doc and this plan disagree, **this plan, `decisions.md` (D7) and `tech-stack.md` win**. The doc is the original input and is not edited.
+
 Owner: Viram Shah. Pace: about 8-10 hrs/week for 6 weeks plus Week 0.
 
 ## 0. How to read this plan
@@ -17,7 +19,8 @@ Owner: Viram Shah. Pace: about 8-10 hrs/week for 6 weeks plus Week 0.
 |---|---|
 | You have **YouTube Premium, not Spotify Premium** | Spotify Dev Mode needs Premium, so **Spotify moves to v1.1**. v1 is YouTube-only. U1 builds the YouTube connector first. |
 | Claude Code builds | Each unit gets a spec, plan and validation file under `specs/features/`. |
-| Apple Silicon, 16GB+ Mac, Claude Desktop | Assumptions hold. 16GB is tight for a 14B model, so default to 7-9B models (see Week 0). |
+| Apple Silicon, 16GB+ Mac | Assumption holds. 16GB is tight for a 14B model, so default to 7-9B models (see Week 0). |
+| Claude Desktop and Claude Code **cannot add MCP servers** (enterprise policy) | **U5 changes from an MCP server to a local web chat and CLI** (D7). The core functions stay the same. MCP becomes an optional thin adapter later, only if policy allows. Testers reach the web chat instead of an MCP client (D8). |
 
 Consequences of YouTube-first (**decide in Week 0**, see Decisions D1-D4):
 
@@ -26,6 +29,13 @@ Consequences of YouTube-first (**decide in Week 0**, see Decisions D1-D4):
 3. YouTube's API gives **no transcripts** for videos you do not own. The requirements doc's answer is the publisher's RSS audio via Podcast Index. That works for shows that publish an RSS feed. **Video-only shows have no RSS.** They need another route (D2).
 4. "Dual links" (YouTube + Spotify) becomes YouTube links only in v1.
 5. The OAuth consent screen in Testing mode **expires refresh tokens after 7 days**. Plan for re-auth, or publish the app (D3).
+
+Consequences of the web-chat front end (D7, D8):
+
+6. The same Python functions as before (`sync_library`, `search_episodes`, `ask`, `get_transcript`, `save_finding`, `export_findings`) live in a **core library**. The web chat, the CLI and the eval harness all call it. Retrieval, citations and the verifier are unchanged.
+7. Answers still come from a local Ollama model. Claude is not used anywhere in the product.
+8. Testers cannot reach a command-line tool on your Mac, so **testers use the web chat**. Exposing it needs login and access control (see D8 and the risks table).
+9. The U1 Desktop-app OAuth flow works for you only. Testers signing in remotely need a **Web application** OAuth client with a redirect URL. That is a Week 6 task, not a Week 1 task.
 
 ## 2. Decisions to make in Week 0
 
@@ -37,6 +47,8 @@ Consequences of YouTube-first (**decide in Week 0**, see Decisions D1-D4):
 | D4 | Heard-status | YouTube has no `resume_point`. Options: ignore "heard", or use a Google Takeout watch-history upload. | Ignore for v1. Revisit after Week 3 (the doc's open question). |
 | D5 | Rubric thresholds | 0.90 quote match, +/-15 s window, "Partly" fails an answer | Accept the doc's proposals unless the Week 2 pilot says otherwise. |
 | D6 | Who second-labels 30 golden items | A tester, a colleague, or a friend who listens | Pick a named person before Week 2. Needs about 3 hrs. |
+| D7 | Front end (**decided Nov 16, 2026**) | (a) Ask IT for an MCP exception. (b) Personal machine and account. (c) Local web chat plus CLI on the same core code. | (c). MCP is blocked by policy, and (c) removes the dependency on any Claude client. MCP can be added later as a thin adapter. |
+| D8 | How testers reach the app (**open**) | (a) Cloudflare Tunnel plus Cloudflare Access (login by email). (b) Testers run it on their own Macs. (c) Screen-share sessions only. | Decide by Week 4. Ask Qualtrics IT whether exposing a service from your work Mac is allowed. If not, use (b) or (c). Never expose the app without login. |
 
 ## 3. Week 0: Setup (click-by-click)
 
@@ -88,10 +100,11 @@ Pick sizes for a 16GB Mac. Use model names that exist in the Ollama library when
 2. The API key and secret arrive by email. Store them in your password manager. Never commit them.
 3. **Pass:** a signed request to `/search/byterm?q=huberman` returns feeds. Ask Claude Code to write the auth-header code (SHA-1 of key+secret+timestamp).
 
-### 0.7 MCP hello world
-1. Ask Claude Code: "Create a minimal MCP server using the official Python SDK with one tool, `ping`, over stdio."
-2. Add it to Claude Desktop: **Settings > Developer > Edit Config**, then add the server under `mcpServers` with the `uv run` command.
-3. Restart Claude Desktop. **Pass:** asking "use ping" returns the tool result.
+### 0.7 Local chat hello world
+1. Ask Claude Code: "Create a minimal FastAPI app with one page and one chat endpoint that sends your message to the local Ollama answer model. Bind to 127.0.0.1 only." The script is `scripts/chat_hello.py`.
+2. Run it: `uv run python scripts/chat_hello.py` and open `http://127.0.0.1:8000`.
+3. **Pass:** typing a message in the page returns a reply from the Ollama model.
+4. (Optional, later) MCP adds a thin adapter over the same core functions, only if Qualtrics policy changes (D7).
 
 ### 0.8 Pick the 20 seed episodes (PM-owned)
 1. Choose 20 episodes you have actually heard, from **5-8 shows**, across at least 2 topics.
@@ -108,9 +121,9 @@ Pick sizes for a 16GB Mac. Use model names that exist in the Ollama library when
 - [ ] Whisper transcript with word timestamps exists
 - [ ] YouTube subscriptions list prints
 - [ ] Podcast Index search returns feeds
-- [ ] Claude Desktop calls your `ping` tool
+- [ ] The local chat page at `127.0.0.1:8000` gets a reply from Ollama
 - [ ] `seed_episodes.csv` has 20 rows
-- [ ] D1-D6 recorded in `specs/decisions.md`
+- [ ] D1-D7 recorded in `specs/decisions.md` (D8 can stay open until Week 4)
 
 ## 4. Weeks 1-6 (milestones)
 
@@ -135,8 +148,8 @@ Each unit uses the **unit loop** in section 5.
 - **Done when:** kappa is at least 0.7 on 20 items. If lower, rewrite ambiguous questions and re-label.
 
 ### Week 3: U4 + U6 + verifier + U5
-- **Goal:** ask in Claude Desktop, get a cited answer and a link.
-- **PM actions:** spec U4 (chunking, hybrid search, reranker), U6 (answer only from retrieved chunks, citation format, verifier) and U5 (the six MCP tools and their JSON schemas). Review each diff for the checklist in section 5.
+- **Goal:** ask in the local web chat (or the CLI), get a cited answer and a link.
+- **PM actions:** spec U4 (chunking, hybrid search, reranker), U6 (answer only from retrieved chunks, citation format, verifier) and U5 (the **core API**: the six functions with JSON schemas, a local web chat with citation cards, thumbs up/down and "save finding", and a CLI `podcast-recall ask "..."`). Review each diff for the checklist in section 5.
 - **Done when:** end-to-end demo works and a baseline scorecard exists.
 - **Decide:** is the full-history upload needed (D4)?
 
@@ -159,8 +172,8 @@ Each unit uses the **unit loop** in section 5.
 ### Week 6: Testers
 - **Goal:** MVP with up to 4 testers, still at least 90% with their questions added.
 - **PM actions:**
-  1. Set up Cloudflare Tunnel (free) to your local MCP server.
-  2. Add each tester's Google account as a test user (D3).
+  1. Apply the D8 decision. If it is Cloudflare, set up a Tunnel (free) **with Cloudflare Access** (login by email) in front of the local web chat. Never expose it without login.
+  2. Create a **Web application** OAuth client with the tunnel URL as the redirect, and add each tester's Google account as a test user (D3).
   3. Write the **tester brief**: what it does, what it cannot do (not indexable shows), Mac-must-be-on uptime, weekly re-auth, how to give thumbs up/down, how to run "delete my data".
   4. Onboard each tester live for 20 minutes. Confirm their library syncs in under 2 minutes.
   5. Add their real questions to the golden set. Re-run `make eval`.
@@ -197,6 +210,8 @@ Each unit uses the **unit loop** in section 5.
 | OAuth token expiry in Testing mode | Syncs fail after 7 days | Re-auth flow; weekly reminder in the tester brief |
 | Judge is unreliable | Agreement under 85% | Grade R3 by hand; deterministic checks carry the gate |
 | Timestamp drift from ads | R7 below 85% | Open links 10 s early; show the quote; offset correction in v2 |
+| Exposing the web chat to testers (D8) | IT policy says no, or no login in front | Check with IT first; Cloudflare Access login; fall back to testers running it locally or screen-share |
+| Any Claude client is unavailable | MCP blocked by policy (already true) | Front end is the local web chat and CLI (D7); nothing depends on a Claude client |
 | Scope creep | New asks mid-week | Add to `roadmap.md` v1.1; do not start without a spec |
 
 ## 8. Time estimate

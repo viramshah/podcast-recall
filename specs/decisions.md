@@ -10,6 +10,8 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 | D4 | "Heard" status (YouTube has no resume_point) | (a) Ignore in v1. (b) Google Takeout watch-history upload. | (a); revisit after Week 3 | Open | | |
 | D5 | Rubric thresholds | Quote match 0.90; timestamp window +/-15 s; "Partly supported" fails an answer | Accept the proposals unless the Week 2 pilot disagrees | Open | | |
 | D6 | Who second-labels 30 golden items (20 in Week 2) | A tester, colleague or friend who listens | Name a person before Week 2; about 3 hrs | Open | | |
+| D7 | Front end | (a) Ask IT for an MCP exception. (b) Personal machine and account. (c) Local web chat plus CLI on the same core code. | (c) | **Decided** | (c) Local web chat (FastAPI, localhost) plus a CLI over a shared core library. MCP is deferred to an optional thin adapter. | 2026-11-16 |
+| D8 | How testers reach the app | (a) Cloudflare Tunnel plus Cloudflare Access (login by email). (b) Testers run it on their own Macs. (c) Screen-share sessions only. | Decide by Week 4, after asking IT whether exposing a service from the work Mac is allowed. Never expose without login. | Open | | |
 
 ## Notes per decision
 
@@ -32,3 +34,15 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 
 ### D6: Second labeller
 - Name: _TBD_
+
+### D7: Front end (decided 2026-11-16)
+- Why: Claude Code returned "not allowed by enterprise policy" when adding an MCP server, so no Claude client can call the product's tools.
+- What changes: U5 becomes a core library with a local web chat and a CLI. The six functions (`sync_library`, `search_episodes`, `ask`, `get_transcript`, `save_finding`, `export_findings`) and their JSON schemas stay. The answer model stays on Ollama. Claude is not used in the product.
+- What stays: retrieval, citations, the verifier, the eval harness and the rubric.
+- Deferred: an MCP adapter, only if Qualtrics policy changes. It would be a thin wrapper over the same functions.
+- Cost: a small web UI to build and test (citation cards, thumbs up/down, save finding), and testers need a way in (D8).
+
+### D8: Tester access
+- Ask Qualtrics IT whether exposing a local service from your work Mac through a tunnel is allowed: _TBD_
+- A tunnel needs login in front (Cloudflare Access), and testers need a Web application OAuth client with a redirect URL: _TBD_
+- Fallbacks: testers run it on their own Macs, or screen-share sessions.

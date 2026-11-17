@@ -1,0 +1,15 @@
+[project]
+name = "podcast-recall"
+version = "0.0.1"
+description = "Local chat that answers questions from your podcast library with timestamped citations"
+requires-python = ">=3.12"
+dependencies = [
+    "mlx-whisper",
+    "google-auth-oauthlib",
+    "google-api-python-client",
+    "fastapi",
+    "uvicorn",
+]
+
+[tool.uv]
+package = false

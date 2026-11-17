@@ -8,3 +8,5 @@ __pycache__/
 *.sqlite
 *.db
 data/audio/
+data/transcripts/
+data/clips/
