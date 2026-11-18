@@ -36,8 +36,16 @@ Branch: `feature/u3-ingest-transcribe` (start it from `main` after U2 is merged)
 - **Download.** The episode's `audio_url` to `<data folder>/audio/<episode_id>.<ext>` (extension from the content type, default `.mp3`), via a temporary `.part` file renamed on success.
 - **Accepted responses:** content type `audio/*`, `video/mp4`, `application/octet-stream` or `binary/octet-stream`. The real test is `ffprobe`: the file must have an audio stream and a duration above 0, otherwise the job fails with that reason.
 - **Disk space.** Before downloading, require free space of at least the larger of 2 times the advertised file size or 500 MB. Otherwise stop with a clear message before downloading anything.
-- **Whisper.** `mlx-whisper`, word timestamps on, `condition_on_previous_text` off (this reduces long repeated-text loops on long audio). The model comes from `PODCAST_RECALL_WHISPER_MODEL` (default `mlx-community/whisper-small-mlx`) and is recorded in every transcript. The **language is detected**, never forced to English, and recorded (D11). `PODCAST_RECALL_WHISPER_LANGUAGE` may force a language.
+- **Whisper.** `mlx-whisper`, word timestamps on, `condition_on_previous_text` off (this reduces long repeated-text loops on long audio). The model comes from `PODCAST_RECALL_WHISPER_MODEL` (default `mlx-community/whisper-small-mlx`) and is recorded in every transcript. The **language is detected**, never forced to English, and recorded (D11). `PODCAST_RECALL_WHISPER_LANGUAGE` may force a language. See the D16 section below for the time limit and retry.
 - **Retention.** Delete the audio after a successful transcript unless `--keep-audio` is given.
+
+### Whisper time limit and larger-model retry (D16, added 2026-11-17 after the real seed run)
+- **Why:** on the real data, Whisper small looped on Hindi/Hinglish audio and one episode stayed in `transcribing` for 45+ minutes. The larger `whisper-large-v3-turbo` model transcribed the same audio cleanly.
+- Whisper runs in a **separate process** (`python -m podcast_recall.whisper_worker`) so it can be stopped. It writes its result to a temporary file that the main process reads.
+- **Time limit** per Whisper run: half the measured audio length plus 300 seconds, never under 600 seconds. A run that exceeds it is stopped and counts as a timeout.
+- **Retry with the larger model:** if the first run times out, or its transcript has a blocking flag (`needs_review`), run once more with `PODCAST_RECALL_WHISPER_FALLBACK_MODEL` (default `mlx-community/whisper-large-v3-turbo`). No retry if the first run already used that model, or the setting is `none`. The retry gets its own time limit.
+- The saved transcript is the **retry's** (it records its own model). Its flags include the informational flag `retried_with_larger_model`, and its `fallback_reason` explains the first run (for example "whisper-small-mlx timed out after 10 minutes"). If the retry is also flagged, it is saved as `needs_review`. If the retry also times out, the attempt fails like any other failure (counts toward the 3 attempts).
+- Ctrl+C stops the Whisper process too.
 
 ### Safety rules for every download (audio and transcript files)
 - Only `http` and `https`, no credentials inside the URL, at most 5 redirects.
@@ -108,7 +116,7 @@ All numbers live in one constants block in `quality.py`.
 Transcript and audio files are in the data folder, outside git. Because both tables point to `episodes`, U1's purge never removes a video whose episode has a transcript.
 
 ## Settings (environment variables, documented in the README)
-`PODCAST_RECALL_WHISPER_MODEL` (default `mlx-community/whisper-small-mlx`) and `PODCAST_RECALL_WHISPER_LANGUAGE` (default: detect).
+`PODCAST_RECALL_WHISPER_MODEL` (default `mlx-community/whisper-small-mlx`) `PODCAST_RECALL_WHISPER_LANGUAGE` (default: detect), and `PODCAST_RECALL_WHISPER_FALLBACK_MODEL` (default `mlx-community/whisper-large-v3-turbo`, `none` turns the retry off).
 
 ## Known risks
 - **Language (D11).** Raj Shamani's "Figuring Out" (5 of the 16 matched seed episodes) is, as far as I know, largely Hindi or Hinglish, and its feed offers no transcript, so it always goes through Whisper. Whisper auto-detects the language, and a mismatch with the feed's language is flagged. Transcribe 5 minutes of one of those episodes early and judge the result before deciding whether they stay in the golden set.

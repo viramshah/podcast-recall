@@ -26,6 +26,7 @@ Settings come only from environment variables.
 | `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | none | Podcast Index credentials for `resolve`. If unset, they are read from `<data folder>/podcastindex.env` (lines like `export PODCASTINDEX_KEY=...`, permissions 600). |
 | `PODCAST_RECALL_WHISPER_MODEL` | `mlx-community/whisper-small-mlx` | Whisper model used when an episode has no usable publisher transcript. |
 | `PODCAST_RECALL_WHISPER_LANGUAGE` | detect | Force a language (for example `hi`) instead of detecting it. |
+| `PODCAST_RECALL_WHISPER_FALLBACK_MODEL` | `mlx-community/whisper-large-v3-turbo` | Larger model tried once when a Whisper run takes too long (half the audio length plus 5 minutes, at least 10) or its transcript is flagged. `none` turns the retry off. |
 
 ## Commands
 

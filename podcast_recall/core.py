@@ -22,7 +22,13 @@ from podcast_recall import (
     transcribe_flow,
     transcripts,
 )
-from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, QuotaExceeded
+from podcast_recall.errors import (
+    ApiError,
+    ConfigError,
+    NotSignedIn,
+    QuotaExceeded,
+    SyncAlreadyRunning,
+)
 from podcast_recall.lock import SyncLock
 from podcast_recall.models import (
     ChannelNeedingFeed,
@@ -432,12 +438,22 @@ def run_transcribe(
 ):
     """Enqueue matched episodes and process the queue. `video_ids` limits the work to those
     videos' episodes. Only one run at a time (a file lock)."""
-    with SyncLock(paths.transcribe_lock_path()), _Db(conn) as db:
-        only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
-        return transcribe_flow.run_queue(
-            db, services or transcribe_flow.Services(), now=now, limit=limit, only_episode_ids=only,
-            keep_audio=keep_audio, on_progress=on_progress,
-        )
+    try:
+        lock = SyncLock(paths.transcribe_lock_path())
+        lock.__enter__()
+    except SyncAlreadyRunning:
+        raise SyncAlreadyRunning(
+            "Another transcribe run is already working. Wait for it to finish, then try again."
+        ) from None
+    try:
+        with _Db(conn) as db:
+            only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
+            return transcribe_flow.run_queue(
+                db, services or transcribe_flow.Services(), now=now, limit=limit,
+                only_episode_ids=only, keep_audio=keep_audio, on_progress=on_progress,
+            )
+    finally:
+        lock.__exit__(None, None, None)
 
 
 def transcribe_status(video_ids=None, *, conn=None, now: Callable[[], str] = store.utc_now):

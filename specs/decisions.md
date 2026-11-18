@@ -68,7 +68,11 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 
 ### D11: Languages
 - As far as I know, Raj Shamani's "Figuring Out" is largely Hindi or Hinglish, and 4 of the 20 seed episodes are from it. Verify by listening: _TBD_
-- Check in Week 1 (U3 validation step 2): transcript quality on 5 minutes of one episode: _TBD_
+- Check in Week 1 (U3 validation step 2): transcript quality on 5 minutes of one episode. 
+  - Result (2026-11-17, PM, FO433 "Diet Expert", minutes 10 to 15): **Whisper small fails on this audio.** It detected Hindi, wrote garbled Devanagari, then looped on "how do you make your food" with zero-length segments. In the full run the same episode stayed in the transcribing state for 45+ minutes with no result.
+  - **Whisper large-v3-turbo works.** Same clip: it detected English and wrote clean, readable text with Hindi words in Latin letters ("bajra jawari", "kachi sabzi"). Real speed about 0.24 of real time (the script's reported 1.118 included a 4 min 22 s model download). A short repeat of "eat" at about 14:38 and two garbled lines at the clip's cut-off were seen; to be checked by ear.
+  - All four Raj Shamani seed episodes were then transcribed with turbo, all ended `ok` and language `en`, about 17,000 words each on average.
+
 - The search embedding model (`nomic-embed-text`) is English-focused, so Hindi retrieval may be weak: _TBD_
 - Decision after the check: keep those episodes in the golden set, move them to a separate experiment, or replace them: _TBD_
 
@@ -79,3 +83,9 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 - Check (run by the PM on 2026-11-17, Lenny's "Muse" episode, minutes 10 to 15, Whisper small): 0.95 similar, 7.4% of words differ; every one of 92 publisher cue starts was within 2 s of Whisper's word times (worst 1.4 s); publisher cues averaged 2.9 s and were at most 6.7 s long; the publisher file has anonymous speaker labels (SPEAKER_00, SPEAKER_01). The publisher got names and jargon right where Whisper small did not ("Nat Friedman", "dogfooding"); Whisper kept filler words the publisher dropped. Whisper ran at about 0.05 of real time. The listening check of the disagreement table is still the PM's to do. Result: the evidence supports D13.
 - Decision (2026-11-17, PM): publisher transcript first. Whisper is the fallback when an episode has no transcript link, or the file fails to download, parse or pass the quality checks.
 - Consequences: U2 must keep each episode's transcript link. U3 builds both paths and records the `source` and the timing detail (`chunk` or `word`) of every transcript. Raj Shamani's episodes (no publisher transcripts) always go through Whisper. If the comparison shows publisher transcripts are too inaccurate or too coarse in timing, revisit this decision.
+
+### D16: Whisper model per episode, and a time limit (opened 2026-11-17)
+- Evidence: see D11. Small is fast and fine for clear English (0.05 of real time) but loops on Hindi and Hinglish. Turbo handles them at about 0.24 of real time.
+- Used so far: the model is a single setting (`PODCAST_RECALL_WHISPER_MODEL`) applied to a whole run. The Raj Shamani episodes were run with turbo by setting it for one run.
+- Gap found: nothing stops one looping episode from holding the queue for an hour. Needs a per-episode time limit, and probably "retry once with turbo when small is flagged or times out". Not built yet.
+- Decision (2026-11-17, PM): build the recommended design. Small stays the default. Each Whisper run has a **time limit of half the audio length plus 5 minutes (never under 10 minutes)**, enforced by running Whisper as a separate process that can be stopped. If a run hits the limit, or its transcript is flagged `needs_review`, the episode is **retried once with the larger model** (`PODCAST_RECALL_WHISPER_FALLBACK_MODEL`, default `mlx-community/whisper-large-v3-turbo`, `none` turns this off). The transcript records the model actually used and why it was retried.

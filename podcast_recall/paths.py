@@ -15,6 +15,7 @@ DEFAULT_HOME = "~/.podcast-recall"
 DEFAULT_CLIENT_SECRET = "~/.podcast-recall/client_secret.json"
 DEFAULT_REFRESH_DAYS = 30
 DEFAULT_WHISPER_MODEL = "mlx-community/whisper-small-mlx"
+DEFAULT_FALLBACK_MODEL = "mlx-community/whisper-large-v3-turbo"
 
 
 def data_home() -> Path:
@@ -69,6 +70,15 @@ def transcribe_lock_path() -> Path:
 
 def whisper_model() -> str:
     return os.environ.get("PODCAST_RECALL_WHISPER_MODEL") or DEFAULT_WHISPER_MODEL
+
+
+def whisper_fallback_model() -> str | None:
+    """The larger model tried once when the first run times out or is flagged, or None if the
+    retry is turned off (`PODCAST_RECALL_WHISPER_FALLBACK_MODEL=none`)."""
+    value = os.environ.get("PODCAST_RECALL_WHISPER_FALLBACK_MODEL")
+    if value is None or not value.strip():
+        return DEFAULT_FALLBACK_MODEL
+    return None if value.strip().lower() == "none" else value.strip()
 
 
 def whisper_language() -> str | None:

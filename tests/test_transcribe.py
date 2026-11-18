@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import urllib.error
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from podcast_recall.audio import AudioError, AudioInfo, InsufficientDiskSpace
 from podcast_recall.cli import main as cli_main
 from podcast_recall.models import Segment
 from podcast_recall.net import DownloadError, FetchInfo
+from podcast_recall.whisper_runner import WhisperTimeout
 from tests.base import T0, Base
 
 DURATION = 600
@@ -74,6 +76,8 @@ class TranscribeBase(Base):
         )
         self.conn.commit()
         self.whisper_calls: list[tuple] = []
+        self.timeouts: list[float] = []
+        self.by_model: dict = {}
         self.audio_seconds = float(DURATION)
         self.raw = whisper_raw()
 
@@ -115,9 +119,13 @@ class TranscribeBase(Base):
     def services(self, files: dict | None = None, **kwargs) -> transcribe_flow.Services:
         files = files if files is not None else {}
 
-        def transcriber(path, model, language):
+        def transcriber(path, model, language, timeout_s):
             self.whisper_calls.append((path, model, language))
-            return self.raw
+            self.timeouts.append(timeout_s)
+            behaviour = self.by_model.get(model, self.raw)
+            if isinstance(behaviour, Exception):
+                raise behaviour
+            return behaviour
 
         defaults = {
             "fetcher": FakeFetcher(files),
@@ -414,8 +422,10 @@ class QueueRules(TranscribeBase):
         from podcast_recall.errors import SyncAlreadyRunning
         from podcast_recall.lock import SyncLock
 
-        with SyncLock(paths.transcribe_lock_path()), self.assertRaises(SyncAlreadyRunning):
+        with SyncLock(paths.transcribe_lock_path()), self.assertRaises(SyncAlreadyRunning) as caught:
             core.run_transcribe(conn=self.conn, now=self.now, services=self.services())
+        self.assertIn("transcribe run", str(caught.exception))
+        self.assertNotIn("sync", str(caught.exception).lower())
 
 
 # ---------------------------------------------------------------------------- the flows
@@ -538,7 +548,7 @@ class WhisperFlow(TranscribeBase):
     def test_ctrl_c_puts_the_job_back_without_using_an_attempt(self):
         files = self.episode_with_audio_only()
 
-        def interrupted(path, model, language):
+        def interrupted(path, model, language, timeout_s):
             raise KeyboardInterrupt
 
         with self.assertRaises(KeyboardInterrupt):
@@ -550,7 +560,7 @@ class WhisperFlow(TranscribeBase):
     def test_whisper_crash_is_an_ordinary_failure(self):
         files = self.episode_with_audio_only()
 
-        def crash(path, model, language):
+        def crash(path, model, language, timeout_s):
             raise RuntimeError("out of memory")
 
         result = self.work(self.services(files, transcriber=crash))
@@ -646,3 +656,146 @@ class LanguageTags(TranscribeBase):
         self.assertEqual(quality.primary_language("en-US"), "en")
         self.assertEqual(quality.primary_language("pt_BR"), "pt")
         self.assertEqual(quality.primary_language(None), "")
+
+
+SMALL = paths.DEFAULT_WHISPER_MODEL
+TURBO = paths.DEFAULT_FALLBACK_MODEL
+
+
+class TimeLimitAndLargerModel(TranscribeBase):
+    """Decision D16: stop a looping Whisper run, and retry once with the larger model."""
+
+    def test_the_limit_is_half_the_audio_plus_five_minutes_and_never_under_ten(self):
+        from podcast_recall.whisper_runner import timeout_for
+
+        self.assertEqual(timeout_for(60), 600)
+        self.assertEqual(timeout_for(1200), 900)
+        self.assertEqual(timeout_for(4260), 2430)
+
+    def test_the_limit_given_to_whisper_comes_from_the_measured_audio(self):
+        files = self.episode_with_audio_only()
+        self.work(self.services(files))
+        self.assertEqual(self.timeouts, [600.0])  # 600 s of audio: 0.5 x 600 + 300 = 600
+
+    def test_a_timeout_on_small_retries_once_with_turbo(self):
+        files = self.episode_with_audio_only()
+        self.by_model = {SMALL: WhisperTimeout("Whisper (whisper-small-mlx) took longer than 10 minutes and was stopped")}
+        outcome = self.work(self.services(files)).outcomes[0]
+        self.assertEqual([c[1] for c in self.whisper_calls], [SMALL, TURBO])
+        self.assertEqual(outcome.status, "ok")
+        self.assertIn("retried_with_larger_model", outcome.flags)
+        self.assertIn("took longer", outcome.fallback_reason)
+        self.assertIn("retried with whisper-large-v3-turbo", outcome.fallback_reason)
+        row = self.row(1)
+        self.assertEqual(row["model"], TURBO)
+        self.assertEqual(self.job(1)["attempts"], 0)
+        self.assertEqual(list(paths.audio_dir().glob("*")), [])
+
+    def test_a_flagged_small_transcript_is_retried_and_the_better_one_is_saved(self):
+        files = self.episode_with_audio_only()
+        self.by_model = {SMALL: whisper_raw(language="hi"), TURBO: whisper_raw(language="en")}
+        outcome = self.work(self.services(files)).outcomes[0]
+        self.assertEqual(outcome.status, "ok")
+        self.assertEqual(self.row(1)["model"], TURBO)
+        self.assertIn("flagged: language_mismatch", outcome.fallback_reason)
+
+    def test_if_the_retry_is_also_flagged_it_is_saved_as_needs_review(self):
+        files = self.episode_with_audio_only()
+        self.by_model = {SMALL: whisper_raw(language="hi"), TURBO: whisper_raw(language="hi")}
+        outcome = self.work(self.services(files)).outcomes[0]
+        self.assertEqual(outcome.status, "needs_review")
+        self.assertIn("language_mismatch", outcome.flags)
+        self.assertIn("retried_with_larger_model", outcome.flags)
+        self.assertEqual(self.row(1)["model"], TURBO)
+
+    def test_if_the_retry_also_times_out_the_attempt_fails(self):
+        files = self.episode_with_audio_only()
+        self.by_model = {SMALL: WhisperTimeout("small too slow"), TURBO: WhisperTimeout("turbo too slow")}
+        result = self.work(self.services(files))
+        self.assertEqual(len(result.failures), 1)
+        self.assertIn("small too slow", result.failures[0][2])
+        self.assertIn("turbo too slow", result.failures[0][2])
+        self.assertEqual(self.job(1)["attempts"], 1)
+        self.assertIsNone(self.row(1))
+        self.assertEqual(list(paths.audio_dir().glob("*")), [])
+
+    def test_no_retry_when_the_first_model_is_already_the_larger_one(self):
+        files = self.episode_with_audio_only()
+        os.environ["PODCAST_RECALL_WHISPER_MODEL"] = TURBO
+        self.addCleanup(os.environ.pop, "PODCAST_RECALL_WHISPER_MODEL", None)
+        self.raw = whisper_raw(language="hi")
+        outcome = self.work(self.services(files)).outcomes[0]
+        self.assertEqual(len(self.whisper_calls), 1)
+        self.assertEqual(outcome.status, "needs_review")
+        self.assertNotIn("retried_with_larger_model", outcome.flags)
+
+    def test_the_retry_can_be_turned_off(self):
+        files = self.episode_with_audio_only()
+        os.environ["PODCAST_RECALL_WHISPER_FALLBACK_MODEL"] = "none"
+        self.addCleanup(os.environ.pop, "PODCAST_RECALL_WHISPER_FALLBACK_MODEL", None)
+        self.by_model = {SMALL: WhisperTimeout("small too slow")}
+        result = self.work(self.services(files))
+        self.assertEqual(len(self.whisper_calls), 1)
+        self.assertEqual(len(result.failures), 1)
+
+    def test_a_good_small_transcript_is_not_retried(self):
+        files = self.episode_with_audio_only()
+        outcome = self.work(self.services(files)).outcomes[0]
+        self.assertEqual(len(self.whisper_calls), 1)
+        self.assertNotIn("retried_with_larger_model", outcome.flags)
+
+    def test_fallback_model_setting(self):
+        os.environ.pop("PODCAST_RECALL_WHISPER_FALLBACK_MODEL", None)
+        self.assertEqual(paths.whisper_fallback_model(), TURBO)
+        for value, expected in (("none", None), ("NONE", None), (" custom/model ", "custom/model"), ("", TURBO)):
+            os.environ["PODCAST_RECALL_WHISPER_FALLBACK_MODEL"] = value
+            self.addCleanup(os.environ.pop, "PODCAST_RECALL_WHISPER_FALLBACK_MODEL", None)
+            self.assertEqual(paths.whisper_fallback_model(), expected, value)
+
+
+class WhisperProcess(TranscribeBase):
+    """The real transcriber starts a separate process; a fake `runner` stands in for it."""
+
+    def test_a_process_that_runs_too_long_is_stopped_with_a_clear_message(self):
+        from podcast_recall.whisper_runner import real_transcriber
+
+        def runner(command, **kwargs):
+            self.assertEqual(kwargs["timeout"], 600)
+            raise subprocess.TimeoutExpired(command, 600)
+
+        with self.assertRaises(WhisperTimeout) as caught:
+            real_transcriber("a.mp3", SMALL, None, 600, runner=runner)
+        self.assertIn("whisper-small-mlx", str(caught.exception))
+        self.assertIn("10 minutes", str(caught.exception))
+
+    def test_the_result_file_is_read_and_the_language_is_passed(self):
+        from podcast_recall.whisper_runner import real_transcriber
+
+        seen = {}
+
+        def runner(command, **kwargs):
+            seen["command"] = command
+            Path(command[-1]).write_text(json.dumps({"language": "en", "segments": []}))
+            return subprocess.CompletedProcess(command, 0)
+
+        result = real_transcriber("a.mp3", SMALL, "hi", 600, runner=runner)
+        self.assertEqual(result["language"], "en")
+        self.assertIn("podcast_recall.whisper_worker", seen["command"])
+        self.assertEqual(seen["command"][-4], "a.mp3")
+        self.assertEqual(seen["command"][-3], SMALL)
+        self.assertEqual(seen["command"][-2], "hi")
+
+    def test_missing_package_and_crashes_are_reported(self):
+        from podcast_recall.errors import ApiError, ConfigError
+        from podcast_recall.whisper_runner import real_transcriber
+
+        def missing(command, **kwargs):
+            return subprocess.CompletedProcess(command, 3)
+
+        def crashed(command, **kwargs):
+            return subprocess.CompletedProcess(command, 1)
+
+        with self.assertRaises(ConfigError):
+            real_transcriber("a.mp3", SMALL, None, 600, runner=missing)
+        with self.assertRaises(ApiError):
+            real_transcriber("a.mp3", SMALL, None, 600, runner=crashed)

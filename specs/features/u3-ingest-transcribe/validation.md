@@ -23,6 +23,7 @@ Run these yourself before merging. They use the 20 seed episodes after U2 has ma
 | 12 | Point one episode's stored transcript link at a broken URL (on a copy of the database) and run | It falls back to Whisper and records the reason |
 | 13 | Check that the 4 `n` seed rows were never downloaded | `transcribe status` lists them as `not_indexable`. No audio, raw file or transcript exists for them |
 | 14 | Search the repo, the logs and the database for secrets, and `git status` for transcript or audio files | No secrets. Audio and transcripts are not tracked by git |
+| 15 | (D16) On a copy of the data folder, run `transcribe retry <Raj Shamani id> --whisper` with the default small model, then `transcribe run --seed` | Small is stopped at the time limit or flagged, then the episode is retried with turbo. The result is `ok`, its model is `whisper-large-v3-turbo`, its flags include `retried_with_larger_model`, and the reason explains why. Takes about an hour |
 
 ## Record the results
 - The Whisper model chosen and why, the real-time factor measured on the full run, and any episodes that failed checks, in `results.md` and `decisions.md`.
@@ -31,4 +32,4 @@ Run these yourself before merging. They use the 20 seed episodes after U2 has ma
 - The final quality thresholds, after seeing real flags (D15).
 
 ## Exit gate
-All fourteen manual steps pass and the review checklist in `plan.md` is ticked. Then update `decisions.md` and the roadmap, and merge.
+All fifteen manual steps pass and the review checklist in `plan.md` is ticked. Then update `decisions.md` and the roadmap, and merge.

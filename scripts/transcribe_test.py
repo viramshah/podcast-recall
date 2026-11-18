@@ -32,6 +32,8 @@ def main() -> None:
     p.add_argument("audio", type=Path)
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--language", default=None, help="force a language, for example hi or en")
+    p.add_argument("--verbose", action="store_true", help="print each segment as it is decoded")
     args = p.parse_args()
 
     duration = audio_seconds(args.audio)
@@ -40,6 +42,9 @@ def main() -> None:
         str(args.audio),
         path_or_hf_repo=args.model,
         word_timestamps=True,
+        condition_on_previous_text=False,  # same setting the app uses
+        verbose=True if args.verbose else None,
+        **({"language": args.language} if args.language else {}),
     )
     elapsed = time.time() - start
 
@@ -57,6 +62,7 @@ def main() -> None:
     ))
 
     print(f"audio: {duration:.0f}s  compute: {elapsed:.0f}s  RTF: {elapsed / duration:.3f}")
+    print(f"detected language: {result.get('language')}")
     print(f"words with timestamps: {len(words)}")
     if words:
         w = words[0]

@@ -110,13 +110,34 @@ def _whisper_path(
         info = services.prober(audio_path)
         jobs.set_state(conn, episode_id, "transcribing", now())
         model = paths.whisper_model()
-        output = whisper_runner.run_whisper(
-            str(audio_path), model, paths.whisper_language(), services.transcriber, services.clock
-        )
-        review = quality.check_whisper(
-            output.segments, audio_duration_s=info.duration_s, language=output.language,
-            feed_language=feed_language, feed_duration_s=feed_duration,
-        )
+        limit = whisper_runner.timeout_for(info.duration_s)
+        retried = False
+        output = None
+        review = None
+        first_problem: str | None = None
+        try:
+            output = _run_model(audio_path, model, services, limit)
+            review = _review(output, info, feed_language, feed_duration)
+            if review.blocking:
+                first_problem = f"{_short(model)} was flagged: {', '.join(review.blocking)}"
+        except whisper_runner.WhisperTimeout as exc:
+            first_problem = str(exc)
+        larger = paths.whisper_fallback_model()
+        if first_problem and larger and larger != model:
+            retried = True
+            jobs.set_state(conn, episode_id, "transcribing", now())
+            try:
+                output = _run_model(audio_path, larger, services, limit)
+            except whisper_runner.WhisperTimeout as exc:
+                raise whisper_runner.WhisperTimeout(f"{first_problem}; then {exc}") from None
+            model = larger
+            review = _review(output, info, feed_language, feed_duration)
+            reason = f"{first_problem}; retried with {_short(larger)}"
+            fallback = f"{fallback}; {reason}" if fallback else reason
+        if output is None or review is None:
+            raise first_problem_error(first_problem)
+        if retried:
+            review.info.append("retried_with_larger_model")
         status = "needs_review" if review.blocking else "ok"
         transcript = Transcript(
             episode_id=episode_id, source="whisper", timing_detail="word", model=model,
@@ -133,6 +154,28 @@ def _whisper_path(
     return JobOutcome(
         episode_id, title, "whisper", status, review.flags, info.duration_s,
         services.clock() - started, fallback,
+    )
+
+
+def _short(model: str) -> str:
+    return model.rsplit("/", 1)[-1]
+
+
+def first_problem_error(problem: str | None) -> whisper_runner.WhisperTimeout:
+    return whisper_runner.WhisperTimeout(problem or "Whisper produced no transcript")
+
+
+def _run_model(audio_path: Path, model: str, services: Services, limit: float):
+    return whisper_runner.run_whisper(
+        str(audio_path), model, paths.whisper_language(), services.transcriber, services.clock,
+        timeout_s=limit,
+    )
+
+
+def _review(output, info, feed_language, feed_duration) -> quality.Review:
+    return quality.check_whisper(
+        output.segments, audio_duration_s=info.duration_s, language=output.language,
+        feed_language=feed_language, feed_duration_s=feed_duration,
     )
 
 
