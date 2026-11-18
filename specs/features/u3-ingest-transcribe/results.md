@@ -1,6 +1,6 @@
 # U3: Ingest and Transcribe, Validation Results
 
-Recorded 2026-11-17 against the PM's real seed list. Spec: `validation.md` (v2). Automated: 248 tests pass, lint clean.
+Recorded 2026-11-17 against the PM's real seed list. Spec: `validation.md` (v2). Automated: 261 tests pass (248 plus 13 for D16), lint clean.
 
 ## Outcome so far
 16 matched seed episodes, **16 transcripts ready**, 0 queued, 0 failed, 0 `needs_review`. 4 videos not indexable (the non-matches). Transcripts take 9 MB. The audio folder is empty.
@@ -22,11 +22,12 @@ Recorded 2026-11-17 against the PM's real seed list. Spec: `validation.md` (v2).
 | 7 | Full seed run | Passed | All 16 `ok`. Turbo run of the 4 Raj Shamani episodes took about an hour |
 | 8 | `status --seed` | Passed | 16 ready, 0 queued, 4 not indexable |
 | 9 | Publisher or Whisper per episode | Passed | Lenny's and Greg all publisher (Greg was expected to be a mix), Raj Shamani all Whisper |
-| 10 | Spot-check words and times | Partly | One publisher episode (12:30, "9 Stages of AI Agent Adoption"): exact match. Four more to do |
+| 10 | Spot-check words and times | Passed | PM spot-checked 5 episodes (publisher and Whisper, including Raj Shamani): words matched and timing was within the targets. First check (12:30, "9 Stages of AI Agent Adoption") was an exact match |
 | 11 | Flags on all transcripts | Passed | No `needs_review`, so no flag evidence for D15 |
-| 12 | Broken link falls back to Whisper | Pending | |
+| 12 | Broken link falls back to Whisper | Passed | PM ran it on a copy of the data folder: fell back to Whisper with the reason recorded (first real run of small on a full English episode) |
 | 13 | The 4 non-matches never downloaded | Passed | 16 transcript files, none for the 4 non-matches, audio folder empty |
-| 14 | Secrets and git check | Pending | |
+| 14 | Secrets and git check | Passed | No audio, transcript, database, `.env` or client-secret file is tracked. The real Podcast Index key appears nowhere in git history. The only data file matching the search (`data/podcastindex_probe.json`) holds public feed data with no credentials; drop it before ever making the repo public |
+| 15 | (D16) Time limit and larger-model retry on real audio | Pending | Covered by 13 automated tests; real run optional, about an hour |
 
 ## Findings
 - **Whisper small cannot be trusted on Hindi/Hinglish audio.** It looped, and one episode stayed "transcribing" for 45+ minutes. Turbo fixed it.
@@ -35,8 +36,8 @@ Recorded 2026-11-17 against the PM's real seed list. Spec: `validation.md` (v2).
 - **D15 thresholds are untested:** no Whisper transcript on real data was flagged, so nothing was learned about where the limits should sit.
 
 ## Open items
-- Steps 10 (four more), 12 and 14.
+- Step 15 (optional real run of D16).
 - Listen to 14:37 to 15:00 of FO433 (the repeated "eat" and the garbled tail).
-- Decide D16 (time limit, and small versus turbo per episode).
+- D16 decided and built (time limit, retry with turbo). See `decisions.md`.
 - D15 stays provisional.
-- Write `docs/Week1c_U3_Explained.md` when U3 is closed.
+- `docs/Week1c_U3_Explained.md` written.
