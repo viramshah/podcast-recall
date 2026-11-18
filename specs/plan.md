@@ -56,6 +56,8 @@ Consequences of the web-chat front end (D7, D8):
 | D13 | Where transcripts come from (**decided Nov 17, 2026**) | (a) Always run Whisper. (b) Use the publisher's transcript file when one exists, Whisper otherwise. | (b) chosen: publisher transcript first, Whisper as the fallback. About 95% of Lenny's and 49% of Startup Ideas episodes have one; none of Raj Shamani's do. The side-by-side comparison stays as a check during U3 validation. |
 | D14 | Matching rule values for U2 (**provisionally decided Nov 17, 2026**) | Starting values in the U2 spec | Tune on the seed run, then record the final values and reasons. |
 | D15 | Transcript quality thresholds for U3 (**open**) | Starting values in the U3 spec | Tune on the seed run, then record the final values and reasons. |
+| D16 | Whisper time limit and larger-model retry (**decided Nov 17, 2026**) | (a) Manual model choice. (b) Time limit plus automatic retry with the larger model. | (b) | Small looped on Hindi/Hinglish audio; turbo transcribed it cleanly. See `decisions.md`. |
+| D17 | U4 retrieval design (**decided Nov 18, 2026**) | The 24 pre-build questions | All recommendations | 75 s chunks with 15 s overlap, hybrid FTS5 plus `sqlite-vec`, no reranker in U4, library-scoped results. See `features/u4-index-retrieval/requirements.md`. |
 
 ## 3. Week 0: Setup (click-by-click)
 
