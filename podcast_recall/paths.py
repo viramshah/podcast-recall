@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 DEFAULT_HOME = "~/.podcast-recall"
 DEFAULT_CLIENT_SECRET = "~/.podcast-recall/client_secret.json"
 DEFAULT_REFRESH_DAYS = 30
+DEFAULT_WHISPER_MODEL = "mlx-community/whisper-small-mlx"
 
 
 def data_home() -> Path:
@@ -48,6 +49,31 @@ def backup_dir() -> Path:
 
 def lock_path(user_id: str) -> Path:
     return data_home() / f"sync-{user_id}.lock"
+
+
+def audio_dir() -> Path:
+    return data_home() / "audio"
+
+
+def transcripts_dir() -> Path:
+    return data_home() / "transcripts"
+
+
+def raw_transcripts_dir() -> Path:
+    return transcripts_dir() / "raw"
+
+
+def transcribe_lock_path() -> Path:
+    return data_home() / "transcribe.lock"
+
+
+def whisper_model() -> str:
+    return os.environ.get("PODCAST_RECALL_WHISPER_MODEL") or DEFAULT_WHISPER_MODEL
+
+
+def whisper_language() -> str | None:
+    """A forced Whisper language, or None to let Whisper detect it (the default)."""
+    return os.environ.get("PODCAST_RECALL_WHISPER_LANGUAGE") or None
 
 
 def podcastindex_env_path() -> Path:

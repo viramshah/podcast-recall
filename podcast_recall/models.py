@@ -185,3 +185,81 @@ class ResolveResult:
     calls: dict[str, int]
     warnings: list[str]
     partial: bool = False
+
+
+@dataclass(frozen=True)
+class Word:
+    text: str
+    start: float
+    end: float
+
+
+@dataclass
+class Segment:
+    start: float
+    end: float
+    text: str
+    speaker: str | None = None
+    words: list[Word] = field(default_factory=list)
+
+
+@dataclass
+class Transcript:
+    """A transcript as stored in `<data folder>/transcripts/<episode_id>.json`. This is the
+    contract with the search unit (U4)."""
+
+    episode_id: int
+    source: str  # "publisher" or "whisper"
+    timing_detail: str  # "chunk" or "word"
+    model: str
+    language: str
+    audio_duration_s: int | None
+    created_at: str
+    segments: list[Segment]
+    status: str = "ok"  # "ok" or "needs_review"
+    flags: list[str] = field(default_factory=list)
+    publisher_url: str | None = None
+    fallback_reason: str | None = None
+
+
+@dataclass
+class JobOutcome:
+    episode_id: int
+    title: str
+    source: str
+    status: str
+    flags: list[str]
+    audio_seconds: float | None
+    elapsed_s: float
+    fallback_reason: str | None = None
+
+
+@dataclass
+class RunResult:
+    outcomes: list[JobOutcome]
+    failures: list[tuple[int, str, str]]  # (episode id, title, error)
+    waiting: int  # jobs that are not due yet
+    enqueued: int
+    recovered: int
+
+
+@dataclass
+class TranscribeStatus:
+    matched_episodes: int
+    transcripts_ok: int
+    needs_review: list[tuple[int, str, list[str]]]  # (episode id, title, flags)
+    queued: int
+    waiting: int
+    running: int
+    failed: list[tuple[int, str, str]]  # (episode id, title, reason)
+    not_indexable_videos: int
+    missing_files: list[int]
+    audio_bytes: int
+    transcript_bytes: int
+
+
+@dataclass
+class ShowResult:
+    transcript: Transcript
+    text_before_and_after: list[tuple[float, float, str]]  # (start, end, text) inside the window
+    total_segments: int

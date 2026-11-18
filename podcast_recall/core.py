@@ -10,7 +10,18 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 
-from podcast_recall import auth, paths, podcastindex, resolve, resolve_store, store, sync
+from podcast_recall import (
+    auth,
+    jobs,
+    paths,
+    podcastindex,
+    resolve,
+    resolve_store,
+    store,
+    sync,
+    transcribe_flow,
+    transcripts,
+)
 from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, QuotaExceeded
 from podcast_recall.lock import SyncLock
 from podcast_recall.models import (
@@ -398,3 +409,71 @@ def write_seed_check(seed_file, out_path, *, conn=None) -> int:
     """Write the seed check CSV (one row per seed video) and return the number of rows."""
     with _Db(conn) as db:
         return resolve.write_seed_check(db, seed_file, out_path)
+
+
+# ---------------------------------------------------------------------------- transcripts (U3)
+
+
+def episode_ids_for_videos(video_ids, *, conn=None) -> list[int]:
+    """Matched episodes for these videos (used to limit a run to the seed list or a library)."""
+    with _Db(conn) as db:
+        return jobs.matched_episode_ids(db, list(video_ids))
+
+
+def run_transcribe(
+    video_ids=None,
+    *,
+    limit: int | None = None,
+    keep_audio: bool = False,
+    on_progress=None,
+    services: transcribe_flow.Services | None = None,
+    conn=None,
+    now: Callable[[], str] = store.utc_now,
+):
+    """Enqueue matched episodes and process the queue. `video_ids` limits the work to those
+    videos' episodes. Only one run at a time (a file lock)."""
+    with SyncLock(paths.transcribe_lock_path()), _Db(conn) as db:
+        only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
+        return transcribe_flow.run_queue(
+            db, services or transcribe_flow.Services(), now=now, limit=limit, only_episode_ids=only,
+            keep_audio=keep_audio, on_progress=on_progress,
+        )
+
+
+def transcribe_status(video_ids=None, *, conn=None, now: Callable[[], str] = store.utc_now):
+    with _Db(conn) as db:
+        if video_ids is None:
+            return transcribe_flow.build_status(db, now())
+        ids = list(video_ids)
+        return transcribe_flow.build_status(
+            db, now(), set(jobs.matched_episode_ids(db, ids)), ids
+        )
+
+
+def retry_transcript(
+    episode_id: int, force_whisper: bool = False, *, conn=None, now: Callable[[], str] = store.utc_now
+) -> None:
+    with _Db(conn) as db:
+        jobs.retry(db, episode_id, force_whisper, now())
+
+
+def accept_transcript(episode_id: int, *, conn=None) -> None:
+    with _Db(conn) as db:
+        transcripts.accept(db, episode_id)
+
+
+def get_transcript(episode_id: int, *, conn=None):
+    """The stored transcript (the contract with U4), or None."""
+    with _Db(conn) as db:
+        return transcripts.load_transcript(db, episode_id)
+
+
+def show_transcript(episode_id: int, at: float | None = None, window: float = 30.0, *, conn=None):
+    """A transcript plus, when `at` is given, the text around that second."""
+    from podcast_recall.models import ShowResult
+
+    transcript = get_transcript(episode_id, conn=conn)
+    if transcript is None:
+        raise ConfigError(f"Episode {episode_id} has no transcript yet.")
+    segments = [] if at is None else transcripts.window_segments(transcript, at, window)
+    return ShowResult(transcript, segments, len(transcript.segments))

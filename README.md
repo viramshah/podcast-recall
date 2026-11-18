@@ -24,6 +24,8 @@ Settings come only from environment variables.
 | `CLIENT_SECRET_PATH` | `~/.podcast-recall/client_secret.json` | Google OAuth client file. |
 | `PODCAST_RECALL_VIDEO_REFRESH_DAYS` | `30` | Stored video details older than this are fetched again during `sync`. |
 | `PODCASTINDEX_KEY`, `PODCASTINDEX_SECRET` | none | Podcast Index credentials for `resolve`. If unset, they are read from `<data folder>/podcastindex.env` (lines like `export PODCASTINDEX_KEY=...`, permissions 600). |
+| `PODCAST_RECALL_WHISPER_MODEL` | `mlx-community/whisper-small-mlx` | Whisper model used when an episode has no usable publisher transcript. |
+| `PODCAST_RECALL_WHISPER_LANGUAGE` | detect | Force a language (for example `hi`) instead of detecting it. |
 
 ## Commands
 
@@ -59,6 +61,20 @@ never overwritten by a later `resolve run`.
 
 Limit: the YouTube API only returns playlists you own. Playlists that belong to other people are
 not included, even if you saved them.
+
+### Getting transcripts (U3)
+
+```
+uv run podcast-recall transcribe run --seed            # publisher transcript first, Whisper as fallback
+uv run podcast-recall transcribe status --seed         # counts, needs_review, failures, disk use
+uv run podcast-recall transcribe show <episode_id> --at 12:30   # text around a time
+uv run podcast-recall transcribe accept <episode_id>   # mark a needs_review transcript as ok
+uv run podcast-recall transcribe retry <episode_id> [--whisper]
+```
+
+Only `matched` episodes are transcribed. Audio is deleted after success (`--keep-audio` keeps it).
+Exit codes: 0 all done, 2 some need review, failed or are waiting to retry, 1 error. For a long run
+on a laptop, prefix with `caffeinate -i` so the Mac does not sleep.
 
 ## Tests
 

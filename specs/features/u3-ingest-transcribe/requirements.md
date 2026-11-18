@@ -28,7 +28,7 @@ Branch: `feature/u3-ingest-transcribe` (start it from `main` after U2 is merged)
 
 ### Publisher transcripts (D13)
 - **Supported formats in v1:** WebVTT (`.vtt`, type `text/vtt`) and SubRip (`.srt`, type `application/srt` or `application/x-subrip`). The format comes from the stored type, falling back to the file extension. JSON, HTML and plain-text transcripts are not used in v1 (they either lack timing or need extra work), and the episode falls through to Whisper.
-- **Parsing.** Read the timed cues. Ignore `WEBVTT` headers, `NOTE`, `STYLE` and cue identifiers. Remove markup tags, decode HTML entities, collapse white space, skip empty cues, and merge consecutive cues with identical text. Keep a speaker name when a cue carries one (`<v Name>`). Times may be `mm:ss.mmm` or `hh:mm:ss.mmm`. Cues must not run backwards in time, or the file fails the checks.
+- **Parsing.** Read the timed cues. Ignore `WEBVTT` headers, `NOTE`, `STYLE` and cue identifiers. Remove markup tags, decode HTML entities, collapse white space, skip empty cues, and merge consecutive cues with identical text. Keep the speaker label when a cue carries one (`<v SPEAKER_00>` or `<v Name>`). The publisher file checked on 2026-11-17 used anonymous labels such as `SPEAKER_00`, not names. Times may be `mm:ss.mmm` or `hh:mm:ss.mmm`. Cues must not run backwards in time, or the file fails the checks.
 - **Keep the original file** next to the parsed transcript (`<data folder>/transcripts/raw/<episode_id>.vtt` or `.srt`), so a parsing problem can be reproduced.
 - Publisher times line up with the publisher's own audio. Dynamic ad insertion can shift them for listeners, so the stored duration check (below) matters.
 
@@ -62,7 +62,7 @@ One JSON file per episode at `<data folder>/transcripts/<episode_id>.json`, writ
 }
 ```
 - `source` is `publisher` or `whisper`. `timing_detail` is `chunk` (publisher cues) or `word` (Whisper).
-- Every segment has `start`, `end` (seconds from the start of the episode) and `text`. Whisper segments also carry `words`, each with `text`, `start` and `end`. `speaker` appears only if the publisher file named one.
+- Every segment has `start`, `end` (seconds from the start of the episode) and `text`. Whisper segments also carry `words`, each with `text`, `start` and `end`. `speaker` appears only if the publisher file carried a label, which may be anonymous (`SPEAKER_00`) rather than a name.
 - `language` is the Whisper-detected language, or the feed's language for a publisher transcript (a publisher file does not say).
 - `audio_duration_s` is the feed's stated duration, or the measured audio length for Whisper.
 
@@ -113,7 +113,7 @@ Transcript and audio files are in the data folder, outside git. Because both tab
 ## Known risks
 - **Language (D11).** Raj Shamani's "Figuring Out" (5 of the 16 matched seed episodes) is, as far as I know, largely Hindi or Hinglish, and its feed offers no transcript, so it always goes through Whisper. Whisper auto-detects the language, and a mismatch with the feed's language is flagged. Transcribe 5 minutes of one of those episodes early and judge the result before deciding whether they stay in the golden set.
 - **Model size.** The small model was tested in Week 0. Exact-quote checks later need accurate text. Compare it with a larger model on one hand-checked 5-minute clip before the full run.
-- **Publisher transcript precision.** Cue times are coarser than Whisper's word times. That is enough for a citation within about 15 seconds. D13 stays revisitable (see validation).
+- **Publisher transcript precision.** Measured on 2026-11-17: cues average about 3 seconds and every cue start was within 2 seconds of Whisper's word times, which is more than enough for a citation. D13 stays revisitable (see validation).
 - **No speaker names from Whisper.** The later check on speaker attribution depends on names stated in the transcript itself.
 - **Dynamic ads.** Publisher transcript times and the audio that listeners hear can drift apart. The duration flag shows where this is likely.
 

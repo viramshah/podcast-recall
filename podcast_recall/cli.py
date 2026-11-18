@@ -339,6 +339,103 @@ def cmd_resolve_reject(args) -> int:
 # ---------------------------------------------------------------------------- parser
 
 
+# ---------------------------------------------------------------------------- transcribe
+
+
+def _mmss(seconds: float) -> str:
+    total = int(seconds)
+    return f"{total // 3600}:{total % 3600 // 60:02d}:{total % 60:02d}"
+
+
+def _parse_at(text: str) -> float:
+    parts = [float(p) for p in text.split(":")]
+    if not 1 <= len(parts) <= 3:
+        raise ConfigError("Use --at as seconds, mm:ss or h:mm:ss.")
+    seconds = 0.0
+    for part in parts:
+        seconds = seconds * 60 + part
+    return seconds
+
+
+def _transcribe_progress(event: dict) -> None:
+    stage = event["stage"]
+    if stage == "start":
+        _err(f"[{event['position']}/{event['total']}] {event['title']} ...")
+    elif stage == "done":
+        extra = f" ({event['fallback_reason']})" if event.get("fallback_reason") else ""
+        flags = f" flags: {', '.join(event['flags'])}" if event["flags"] else ""
+        _err(f"    {event['source']}, {event['status']}{flags}{extra}")
+    elif stage == "failed":
+        _err(f"    failed ({event['state']}): {event['error']}")
+
+
+def cmd_transcribe_run(args) -> int:
+    video_ids = _target_ids(args) if args.seed is not None else None
+    result = core.run_transcribe(
+        video_ids, limit=args.limit, keep_audio=args.keep_audio, on_progress=_transcribe_progress
+    )
+    publisher_n = sum(1 for o in result.outcomes if o.source == "publisher")
+    review = [o for o in result.outcomes if o.status == "needs_review"]
+    print(
+        f"Transcribed {len(result.outcomes)} episode(s): {publisher_n} from the publisher, "
+        f"{len(result.outcomes) - publisher_n} with Whisper. "
+        f"New jobs: {result.enqueued}. Recovered after a crash: {result.recovered}."
+    )
+    for o in review:
+        print(f"  needs review: {o.episode_id} {o.title} ({', '.join(o.flags)})")
+    for episode_id, title, error in result.failures:
+        print(f"  failed: {episode_id} {title}: {error}")
+    if result.waiting:
+        print(f"{result.waiting} job(s) are waiting to retry. Run this again in a few minutes.")
+    return EXIT_PARTIAL if (review or result.failures or result.waiting) else EXIT_OK
+
+
+def cmd_transcribe_status(args) -> int:
+    video_ids = _target_ids(args) if args.seed is not None else None
+    s = core.transcribe_status(video_ids)
+    print(f"Matched episodes: {s.matched_episodes}")
+    print(f"Transcripts ready: {s.transcripts_ok}")
+    print(f"Queued: {s.queued}, waiting to retry: {s.waiting}, running: {s.running}")
+    print(f"Videos not indexable (no match yet): {s.not_indexable_videos}")
+    print(f"Disk: audio {s.audio_bytes // 1_000_000} MB, transcripts {s.transcript_bytes // 1_000_000} MB")
+    for episode_id, title, flags in s.needs_review:
+        print(f"  needs review: {episode_id} {title} ({', '.join(flags)})")
+    for episode_id, title, error in s.failed:
+        print(f"  failed: {episode_id} {title}: {error}")
+    for episode_id in s.missing_files:
+        print(f"  missing transcript file: {episode_id}")
+    return EXIT_PARTIAL if (s.needs_review or s.failed or s.missing_files) else EXIT_OK
+
+
+def cmd_transcribe_retry(args) -> int:
+    core.retry_transcript(args.episode_id, args.whisper)
+    print(f"Episode {args.episode_id} is queued again. Run: podcast-recall transcribe run")
+    return EXIT_OK
+
+
+def cmd_transcribe_accept(args) -> int:
+    core.accept_transcript(args.episode_id)
+    print(f"Episode {args.episode_id} marked as reviewed (ok).")
+    return EXIT_OK
+
+
+def cmd_transcribe_show(args) -> int:
+    at = _parse_at(args.at) if args.at else None
+    shown = core.show_transcript(args.episode_id, at, args.window)
+    t = shown.transcript
+    print(
+        f"Episode {t.episode_id}: {t.source} transcript, {t.timing_detail} timing, "
+        f"model {t.model}, language {t.language}, status {t.status}"
+        + (f", flags: {', '.join(t.flags)}" if t.flags else "")
+    )
+    if t.fallback_reason:
+        print(f"Why not the publisher's: {t.fallback_reason}")
+    print(f"{shown.total_segments} segments.")
+    for start, _end, text in shown.text_before_and_after:
+        print(f"[{_mmss(start)}] {text}")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="podcast-recall",
@@ -413,6 +510,35 @@ def build_parser() -> argparse.ArgumentParser:
     p = radd("reject", cmd_resolve_reject, "Say that a video has no matching episode.",
              seed=False, user=False)
     p.add_argument("video_id")
+
+    transcribe = sub.add_parser("transcribe", help="Get transcripts for matched episodes.")
+    tsub = transcribe.add_subparsers(dest="command", required=True)
+
+    def tadd(name: str, func, help_text: str) -> argparse.ArgumentParser:
+        sp = tsub.add_parser(name, help=help_text, description=help_text)
+        sp.set_defaults(func=func)
+        return sp
+
+    def seed_args(sp) -> None:
+        sp.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
+                        help=f"only the seed file's videos (default file: {DEFAULT_SEED})")
+        sp.add_argument("--user", default=core.OWNER, help="local user name (default: owner)")
+
+    p = tadd("run", cmd_transcribe_run, "Transcribe matched episodes (publisher first, then Whisper).")
+    seed_args(p)
+    p.add_argument("--limit", type=int, default=None, help="stop after this many episodes")
+    p.add_argument("--keep-audio", action="store_true", help="do not delete downloaded audio")
+    p = tadd("status", cmd_transcribe_status, "Show transcript counts and problems.")
+    seed_args(p)
+    p = tadd("retry", cmd_transcribe_retry, "Queue an episode again with fresh attempts.")
+    p.add_argument("episode_id", type=int)
+    p.add_argument("--whisper", action="store_true", help="skip the publisher transcript")
+    p = tadd("accept", cmd_transcribe_accept, "Mark a needs_review transcript as ok.")
+    p.add_argument("episode_id", type=int)
+    p = tadd("show", cmd_transcribe_show, "Show a transcript's details and text near a time.")
+    p.add_argument("episode_id", type=int)
+    p.add_argument("--at", help="time as seconds, mm:ss or h:mm:ss")
+    p.add_argument("--window", type=float, default=30.0, help="seconds either side (default 30)")
     return parser
 
 
