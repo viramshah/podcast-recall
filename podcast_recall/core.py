@@ -8,15 +8,17 @@ fakes; when they are omitted the real database, Keychain and YouTube client are 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 
 from podcast_recall import (
     auth,
+    indexer,
     jobs,
     paths,
     podcastindex,
     resolve,
     resolve_store,
+    retrieval,
     store,
     sync,
     transcribe_flow,
@@ -420,6 +422,22 @@ def write_seed_check(seed_file, out_path, *, conn=None) -> int:
 # ---------------------------------------------------------------------------- transcripts (U3)
 
 
+@contextmanager
+def _one_run_only(lock_path, what: str):
+    """Hold a file lock for the whole run. A second run is refused with a message about `what`."""
+    lock = SyncLock(lock_path)
+    try:
+        lock.__enter__()
+    except SyncAlreadyRunning:
+        raise SyncAlreadyRunning(
+            f"Another {what} is already working. Wait for it to finish, then try again."
+        ) from None
+    try:
+        yield
+    finally:
+        lock.__exit__(None, None, None)
+
+
 def episode_ids_for_videos(video_ids, *, conn=None) -> list[int]:
     """Matched episodes for these videos (used to limit a run to the seed list or a library)."""
     with _Db(conn) as db:
@@ -438,22 +456,12 @@ def run_transcribe(
 ):
     """Enqueue matched episodes and process the queue. `video_ids` limits the work to those
     videos' episodes. Only one run at a time (a file lock)."""
-    try:
-        lock = SyncLock(paths.transcribe_lock_path())
-        lock.__enter__()
-    except SyncAlreadyRunning:
-        raise SyncAlreadyRunning(
-            "Another transcribe run is already working. Wait for it to finish, then try again."
-        ) from None
-    try:
-        with _Db(conn) as db:
-            only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
-            return transcribe_flow.run_queue(
-                db, services or transcribe_flow.Services(), now=now, limit=limit,
-                only_episode_ids=only, keep_audio=keep_audio, on_progress=on_progress,
-            )
-    finally:
-        lock.__exit__(None, None, None)
+    with _one_run_only(paths.transcribe_lock_path(), "transcribe run"), _Db(conn) as db:
+        only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
+        return transcribe_flow.run_queue(
+            db, services or transcribe_flow.Services(), now=now, limit=limit,
+            only_episode_ids=only, keep_audio=keep_audio, on_progress=on_progress,
+        )
 
 
 def transcribe_status(video_ids=None, *, conn=None, now: Callable[[], str] = store.utc_now):
@@ -493,3 +501,61 @@ def show_transcript(episode_id: int, at: float | None = None, window: float = 30
         raise ConfigError(f"Episode {episode_id} has no transcript yet.")
     segments = [] if at is None else transcripts.window_segments(transcript, at, window)
     return ShowResult(transcript, segments, len(transcript.segments))
+
+
+# ---------------------------------------------------------------------------- index and search (U4)
+
+
+def build_index(
+    video_ids=None,
+    *,
+    rebuild: bool = False,
+    on_progress=None,
+    services: indexer.IndexServices | None = None,
+    conn=None,
+    now: Callable[[], str] = store.utc_now,
+):
+    """Index every `ok` transcript that is new or changed. `video_ids` limits the work to those
+    videos' episodes. Only one run at a time (a file lock)."""
+    with _one_run_only(paths.index_lock_path(), "index build"), _Db(conn) as db:
+        only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
+        return indexer.build_index(
+            db, services or indexer.IndexServices(), now=now, only_episode_ids=only,
+            rebuild=rebuild, on_progress=on_progress,
+        )
+
+
+def index_status(video_ids=None, *, conn=None):
+    with _Db(conn) as db:
+        only = None if video_ids is None else set(jobs.matched_episode_ids(db, list(video_ids)))
+        return indexer.index_status(db, paths.embed_model(), only)
+
+
+def search_episodes(
+    query: str,
+    user_id: str = OWNER,
+    *,
+    show: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    episode_ids=None,
+    limit: int = retrieval.DEFAULT_LIMIT,
+    per_episode: int = retrieval.DEFAULT_PER_EPISODE,
+    services: indexer.IndexServices | None = None,
+    conn=None,
+):
+    """The best chunks for a query, from this user's library only."""
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        services = services or indexer.IndexServices()
+        return retrieval.find(
+            db, services.get_embedder(), query, user_id, show=show, since=since, until=until,
+            episode_ids=episode_ids, limit=limit, per_episode=per_episode,
+            use_vectors=services.use_vectors,
+        )
+
+
+def get_chunk(chunk_id: int, *, conn=None):
+    with _Db(conn) as db:
+        return retrieval.get_chunk(db, chunk_id)

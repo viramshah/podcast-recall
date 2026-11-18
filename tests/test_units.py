@@ -286,7 +286,8 @@ class Migrations(Base):
         db = Path(self.home) / "t.db"
         backups = Path(self.home) / "backups"
         conn = store.connect(db, backups)
-        for n in range(2, 7):
+        latest = max(v for v, _name, _sql in store._migration_files())
+        for n in range(latest + 1, latest + 6):  # five more upgrades than the real ones
             extra = [(1, "001_initial.sql", ""), (n, f"{n:03d}_extra.sql", f"CREATE TABLE extra{n} (a);")]
             store._migration_files = lambda extra=extra: extra
             store.migrate(conn, backups)

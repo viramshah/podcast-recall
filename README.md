@@ -27,6 +27,8 @@ Settings come only from environment variables.
 | `PODCAST_RECALL_WHISPER_MODEL` | `mlx-community/whisper-small-mlx` | Whisper model used when an episode has no usable publisher transcript. |
 | `PODCAST_RECALL_WHISPER_LANGUAGE` | detect | Force a language (for example `hi`) instead of detecting it. |
 | `PODCAST_RECALL_WHISPER_FALLBACK_MODEL` | `mlx-community/whisper-large-v3-turbo` | Larger model tried once when a Whisper run takes too long (half the audio length plus 5 minutes, at least 10) or its transcript is flagged. `none` turns the retry off. |
+| `PODCAST_RECALL_EMBED_MODEL` | `nomic-embed-text` | Ollama model used to turn transcript chunks and questions into vectors for meaning search. Pull it once with `ollama pull nomic-embed-text`. |
+| `PODCAST_RECALL_OLLAMA_URL` | `http://127.0.0.1:11434` | Where Ollama listens. Only a loopback address is accepted. |
 
 ## Commands
 
@@ -76,6 +78,21 @@ uv run podcast-recall transcribe retry <episode_id> [--whisper]
 Only `matched` episodes are transcribed. Audio is deleted after success (`--keep-audio` keeps it).
 Exit codes: 0 all done, 2 some need review, failed or are waiting to retry, 1 error. For a long run
 on a laptop, prefix with `caffeinate -i` so the Mac does not sleep.
+
+### Searching transcripts (U4)
+
+```
+uv run podcast-recall index build --seed               # split transcripts into chunks and index them
+uv run podcast-recall index status --seed              # what is indexed and what is waiting
+uv run podcast-recall search "agent harness"           # best matches, with time and a YouTube link
+uv run podcast-recall search '"exact phrase"' --show lenny --since 2026-10-01 --explain
+```
+
+Run `index build` after `transcribe run` (and after `transcribe accept`). It is safe to run again: only
+new or changed transcripts are indexed. Search combines keyword and meaning matching and only returns
+episodes in your own library. Words are plain words; text in double quotes is an exact phrase. Without
+Ollama running, `index build` stops with a clear message and `search` falls back to keywords.
+`--explain` shows the scores, including the meaning distance (0 is identical; larger is further away).
 
 ## Tests
 

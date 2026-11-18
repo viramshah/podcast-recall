@@ -387,6 +387,8 @@ def cmd_transcribe_run(args) -> int:
         print(f"  failed: {episode_id} {title}: {error}")
     if result.waiting:
         print(f"{result.waiting} job(s) are waiting to retry. Run this again in a few minutes.")
+    if result.outcomes:
+        print("Run `podcast-recall index build` to make the new transcripts searchable.")
     return EXIT_PARTIAL if (review or result.failures or result.waiting) else EXIT_OK
 
 
@@ -433,6 +435,68 @@ def cmd_transcribe_show(args) -> int:
     print(f"{shown.total_segments} segments.")
     for start, _end, text in shown.text_before_and_after:
         print(f"[{_mmss(start)}] {text}")
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------- index and search
+
+
+def _index_progress(event: dict) -> None:
+    if event["stage"] == "start":
+        _err(f"[{event['position']}/{event['total']}] {event['title']} ...")
+    else:
+        _err(f"    {event['chunks']} chunks")
+
+
+def cmd_index_build(args) -> int:
+    video_ids = _target_ids(args) if args.seed is not None else None
+    result = core.build_index(video_ids, rebuild=args.rebuild, on_progress=_index_progress)
+    print(
+        f"Indexed {result.indexed} episode(s), {result.chunks} chunks. "
+        f"Already up to date: {result.up_to_date}. Removed: {result.removed}. "
+        f"Meaning search: {'on' if result.vectors_used else 'off'}."
+    )
+    for warning in result.warnings:
+        print(f"Warning: {warning}")
+    return EXIT_PARTIAL if result.warnings else EXIT_OK
+
+
+def cmd_index_status(args) -> int:
+    video_ids = _target_ids(args) if args.seed is not None else None
+    s = core.index_status(video_ids)
+    print(f"Episodes indexed: {s.episodes_indexed}, chunks: {s.chunks}")
+    print(f"Waiting to be indexed: {s.waiting}")
+    print(f"Episodes without meaning vectors: {s.without_vectors}")
+    print(f"Chunking version: {s.chunking_version}, embedding model: {s.embed_model}")
+    print(f"Vector search available: {'yes' if s.vectors_available else 'no'} ({s.vector_rows} vectors)")
+    return EXIT_PARTIAL if (s.waiting or s.without_vectors) else EXIT_OK
+
+
+def cmd_search(args) -> int:
+    result = core.search_episodes(
+        args.query, args.user, show=args.show, since=args.since, until=args.until,
+        limit=args.limit,
+    )
+    for warning in result.warnings:
+        _err(f"Warning: {warning}")
+    if not result.hits:
+        print("No results.")
+        return EXIT_OK
+    for number, hit in enumerate(result.hits, 1):
+        speaker = f" [{hit.speaker}]" if hit.speaker else ""
+        print(f"{number}. {hit.show}: {hit.title}")
+        print(f"   {_mmss(hit.start_s)} to {_mmss(hit.end_s)}{speaker}")
+        snippet = hit.text if len(hit.text) <= 300 else hit.text[:300].rsplit(" ", 1)[0] + " ..."
+        print(f"   {snippet}")
+        if hit.url:
+            print(f"   {hit.url}")
+        if args.explain:
+            distance = "-" if hit.vector_distance is None else f"{hit.vector_distance:.3f}"
+            print(
+                f"   chunk {hit.chunk_id}  score {hit.score:.4f}  keyword rank "
+                f"{hit.keyword_rank or '-'}  meaning rank {hit.vector_rank or '-'}  "
+                f"meaning distance {distance}"
+            )
     return EXIT_OK
 
 
@@ -539,6 +603,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("episode_id", type=int)
     p.add_argument("--at", help="time as seconds, mm:ss or h:mm:ss")
     p.add_argument("--window", type=float, default=30.0, help="seconds either side (default 30)")
+
+    index = sub.add_parser("index", help="Build and inspect the search index.")
+    isub = index.add_subparsers(dest="command", required=True)
+
+    def iadd(name: str, func, help_text: str) -> argparse.ArgumentParser:
+        sp = isub.add_parser(name, help=help_text, description=help_text)
+        sp.set_defaults(func=func)
+        sp.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
+                        help=f"only the seed file's videos (default file: {DEFAULT_SEED})")
+        sp.add_argument("--user", default=core.OWNER, help="local user name (default: owner)")
+        return sp
+
+    p = iadd("build", cmd_index_build, "Index new or changed transcripts for search.")
+    p.add_argument("--rebuild", action="store_true", help="index every episode again")
+    iadd("status", cmd_index_status, "Show how much is indexed and what is waiting.")
+
+    p = add("search", cmd_search, "Search your library's transcripts.")
+    p.add_argument("query", help="words to look for; put an exact phrase in double quotes")
+    p.add_argument("--show", help="only this show (part of its name)")
+    p.add_argument("--since", help="only episodes published on or after YYYY-MM-DD")
+    p.add_argument("--until", help="only episodes published on or before YYYY-MM-DD")
+    p.add_argument("--limit", type=int, default=8, help="how many results (1 to 50, default 8)")
+    p.add_argument("--explain", action="store_true", help="show the scores behind each result")
     return parser
 
 

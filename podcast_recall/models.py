@@ -263,3 +263,52 @@ class ShowResult:
     transcript: Transcript
     text_before_and_after: list[tuple[float, float, str]]  # (start, end, text) inside the window
     total_segments: int
+
+
+# ---------------------------------------------------------------------------- U4: index and search
+
+
+@dataclass
+class BuildResult:
+    indexed: int  # episodes (re)indexed in this run
+    chunks: int  # chunks written
+    up_to_date: int  # episodes already current
+    removed: int  # episodes whose chunks were removed (transcript no longer `ok`)
+    vectors_used: bool
+    warnings: list[str]
+
+
+@dataclass
+class IndexStatus:
+    episodes_indexed: int
+    chunks: int
+    waiting: int  # `ok` transcripts that need (re)indexing
+    without_vectors: int  # indexed episodes that have no vectors yet
+    chunking_version: int
+    embed_model: str
+    vectors_available: bool
+    vector_rows: int
+
+
+@dataclass
+class SearchHit:
+    chunk_id: int
+    episode_id: int
+    show: str
+    title: str
+    start_s: float
+    end_s: float
+    text: str
+    speaker: str | None
+    url: str | None
+    keyword_rank: int | None
+    vector_rank: int | None
+    vector_distance: float | None  # cosine distance of the meaning match (0 = identical)
+    score: float
+
+
+@dataclass
+class SearchResult:
+    hits: list[SearchHit]
+    vectors_used: bool
+    warnings: list[str]

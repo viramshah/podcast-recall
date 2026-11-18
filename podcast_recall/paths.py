@@ -16,6 +16,8 @@ DEFAULT_CLIENT_SECRET = "~/.podcast-recall/client_secret.json"
 DEFAULT_REFRESH_DAYS = 30
 DEFAULT_WHISPER_MODEL = "mlx-community/whisper-small-mlx"
 DEFAULT_FALLBACK_MODEL = "mlx-community/whisper-large-v3-turbo"
+DEFAULT_EMBED_MODEL = "nomic-embed-text"
+DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 
 
 def data_home() -> Path:
@@ -66,6 +68,18 @@ def raw_transcripts_dir() -> Path:
 
 def transcribe_lock_path() -> Path:
     return data_home() / "transcribe.lock"
+
+
+def index_lock_path() -> Path:
+    return data_home() / "index.lock"
+
+
+def embed_model() -> str:
+    return os.environ.get("PODCAST_RECALL_EMBED_MODEL") or DEFAULT_EMBED_MODEL
+
+
+def ollama_url() -> str:
+    return (os.environ.get("PODCAST_RECALL_OLLAMA_URL") or DEFAULT_OLLAMA_URL).rstrip("/")
 
 
 def whisper_model() -> str:
