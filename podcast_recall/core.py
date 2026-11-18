@@ -10,13 +10,17 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from contextlib import nullcontext
 
-from podcast_recall import auth, paths, store, sync
+from podcast_recall import auth, paths, podcastindex, resolve, resolve_store, store, sync
 from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, QuotaExceeded
 from podcast_recall.lock import SyncLock
 from podcast_recall.models import (
+    ChannelNeedingFeed,
     ChannelRow,
+    FeedInfo,
     FetchResult,
     PurgeResult,
+    ResolvedVideo,
+    ResolveResult,
     RevokeResult,
     SignInResult,
     StatusResult,
@@ -303,3 +307,94 @@ def purge_stale_videos(
     with _Db(conn) as db:
         deleted, kept = store.purge(db, store.cutoff(now(), days))
     return PurgeResult(deleted, kept)
+
+
+# ---------------------------------------------------------------------------- U2: episode resolver
+
+
+def _pi_client(pi_client: podcastindex.PodcastIndexClient | None) -> podcastindex.PodcastIndexClient:
+    return pi_client or podcastindex.PodcastIndexClient(podcastindex.load_credentials())
+
+
+def resolvable_library_videos(user_id: str = OWNER, *, conn=None) -> list[str]:
+    """Video IDs in the user's library that have details (not deleted or private)."""
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        return resolve_store.library_video_ids(db, user_id)
+
+
+def find_feed_candidates(
+    channel_id: str,
+    limit: int = 5,
+    *,
+    conn=None,
+    pi_client: podcastindex.PodcastIndexClient | None = None,
+) -> list[FeedInfo]:
+    """Podcast feeds that might belong to a YouTube channel, found by the channel's title."""
+    with _Db(conn) as db:
+        return resolve.find_feed_candidates(db, _pi_client(pi_client), channel_id, limit)
+
+
+def set_channel_feed(
+    channel_id: str,
+    feed_ref: str,
+    *,
+    conn=None,
+    pi_client: podcastindex.PodcastIndexClient | None = None,
+    now: Callable[[], str] = store.utc_now,
+) -> FeedInfo | None:
+    """Record a channel's feed: `none`, a Podcast Index feed ID or a feed URL."""
+    wants_none = feed_ref.strip().lower() == "none"
+    with _Db(conn) as db:
+        client = None if wants_none else _pi_client(pi_client)
+        return resolve.set_channel_feed(db, client, channel_id, feed_ref, now())
+
+
+def channels_needing_feed(video_ids, *, conn=None) -> list[ChannelNeedingFeed]:
+    with _Db(conn) as db:
+        return resolve.channels_needing_feed(db, list(video_ids))
+
+
+def resolve_videos(
+    video_ids,
+    *,
+    conn=None,
+    pi_client: podcastindex.PodcastIndexClient | None = None,
+    now: Callable[[], str] = store.utc_now,
+    refresh: bool = True,
+    full_refresh: bool = False,
+) -> ResolveResult:
+    """Match videos to feed episodes. See `resolve.resolve_videos` for the rules."""
+    client = pi_client
+    if client is None and refresh:
+        client = podcastindex.PodcastIndexClient(podcastindex.load_credentials())
+    with _Db(conn) as db:
+        return resolve.resolve_videos(
+            db, client, list(video_ids), now(), refresh=refresh, full_refresh=full_refresh
+        )
+
+
+def confirm_match(
+    video_id: str, episode_id: int, *, conn=None, now: Callable[[], str] = store.utc_now
+) -> ResolvedVideo:
+    with _Db(conn) as db:
+        return resolve.confirm_match(db, video_id, episode_id, now())
+
+
+def reject_match(
+    video_id: str, *, conn=None, now: Callable[[], str] = store.utc_now
+) -> ResolvedVideo:
+    with _Db(conn) as db:
+        return resolve.reject_match(db, video_id, now())
+
+
+def list_review_items(video_ids, *, conn=None) -> list[dict]:
+    with _Db(conn) as db:
+        return resolve.list_review_items(db, list(video_ids))
+
+
+def write_seed_check(seed_file, out_path, *, conn=None) -> int:
+    """Write the seed check CSV (one row per seed video) and return the number of rows."""
+    with _Db(conn) as db:
+        return resolve.write_seed_check(db, seed_file, out_path)

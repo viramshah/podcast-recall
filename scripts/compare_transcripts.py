@@ -226,9 +226,11 @@ def render_report(name: str, start: float, length: float, model: str, whisper_se
     lines = [
         f"# Publisher transcript versus Whisper: {name}",
         "",
-        f"Section: {mmss(start)} to {mmss(start + length)} of the episode ({length:.0f} s). "
-        f"Whisper model: `{model}`, {whisper_seconds:.0f} s to transcribe "
-        f"(real-time factor {whisper_seconds / length:.2f}).",
+        (
+            f"Section: {mmss(start)} to {mmss(start + length)} of the episode ({length:.0f} s). "
+            f"Whisper model: `{model}`, {whisper_seconds:.0f} s to transcribe "
+            f"(real-time factor {whisper_seconds / length:.2f})."
+        ),
         "",
         "Neither transcript is ground truth. These numbers show how closely they agree.",
         "",
@@ -243,10 +245,14 @@ def render_report(name: str, start: float, length: float, model: str, whisper_se
         f"| Median timing difference | {m['offset_median']:+.2f} s |",
         f"| Within 2 s / 5 s / 15 s | {m['within_2s']:.0%} / {m['within_5s']:.0%} / {m['within_15s']:.0%} |",
         f"| Worst timing difference | {m['offset_worst']:+.1f} s |",
-        f"| 12-word quotes from the publisher that appear in Whisper (at least 0.90 similar) | "
-        f"{m['publisher_quotes_found_in_whisper']:.0%} |",
-        f"| 12-word quotes from Whisper that appear in the publisher's (at least 0.90 similar) | "
-        f"{m['whisper_quotes_found_in_publisher']:.0%} |",
+        (
+            "| 12-word quotes from the publisher that appear in Whisper (at least 0.90 similar) | "
+            f"{m['publisher_quotes_found_in_whisper']:.0%} |"
+        ),
+        (
+            "| 12-word quotes from Whisper that appear in the publisher's (at least 0.90 similar) | "
+            f"{m['whisper_quotes_found_in_publisher']:.0%} |"
+        ),
         f"| Speaker labels in the publisher file | {', '.join(m['speakers']) or 'none found'} |",
         "",
         "## Where they disagree most (listen at these times)",
@@ -263,10 +269,14 @@ def render_report(name: str, start: float, length: float, model: str, whisper_se
     lines += [
         "",
         "## How to read this",
-        "- **Similarity** above about 0.90 and timing within 2 s for most cue starts means the "
-        "publisher file is a good substitute for Whisper for citations.",
-        "- **Cue length** is the precision of the publisher's timing. A 20-second cue cannot point "
-        "to the exact second, but it can still support a link that opens a few seconds early.",
+        (
+            "- **Similarity** above about 0.90 and timing within 2 s for most cue starts means the "
+            "publisher file is a good substitute for Whisper for citations."
+        ),
+        (
+            "- **Cue length** is the precision of the publisher's timing. A 20-second cue cannot point "
+            "to the exact second, but it can still support a link that opens a few seconds early."
+        ),
         "- The table above is what decides it: count how often each side was right.",
     ]
     return "\n".join(lines) + "\n"

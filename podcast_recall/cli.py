@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 
 from podcast_recall import core, ids, logging_setup, paths
-from podcast_recall.errors import NotSignedIn, PodcastRecallError
-from podcast_recall.models import FetchResult, SyncResult
+from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, PodcastRecallError
+from podcast_recall.models import FeedInfo, FetchResult, ResolveResult, SyncResult
 
 EXIT_OK, EXIT_ERROR, EXIT_PARTIAL, EXIT_SIGN_IN = 0, 1, 2, 3
 
@@ -171,6 +172,170 @@ def cmd_purge(args) -> int:
     return EXIT_OK
 
 
+# ---------------------------------------------------------------------------- resolve
+
+DEFAULT_SEED = "data/seed_episodes.csv"
+SEED_CHECK_PATH = "data/seed_resolver_check.csv"
+
+
+def _ask(question: str) -> str:
+    try:
+        return input(question).strip()
+    except EOFError:
+        return "s"  # no terminal: skip
+
+
+def _target_ids(args) -> list[str]:
+    """The seed file's videos with --seed, otherwise the signed-in user's library."""
+    if args.seed is not None:
+        found, _unparsed = ids.load_ids([args.seed])
+        return found
+    return core.resolvable_library_videos(args.user)
+
+
+def _score_text(score, title, date, duration) -> str:
+    def f(value) -> str:
+        return "n/a" if value is None else f"{value:.2f}"
+
+    return f"score {f(score)} (title {f(title)}, date {f(date)}, length {f(duration)})"
+
+
+def format_feed(number: int, feed: FeedInfo) -> str:
+    updated = datetime.fromtimestamp(feed.last_update).strftime("%Y-%m-%d") if feed.last_update else "?"
+    return (
+        f"  {number}. {feed.title} | by {feed.author or 'unknown'} | "
+        f"{feed.episode_count if feed.episode_count is not None else '?'} episodes | "
+        f"updated {updated} | {feed.language or '?'} | {feed.url}"
+    )
+
+
+def format_resolve(result: ResolveResult) -> str:
+    c = result.counts
+    lines = [
+        (
+            f"Resolved {len(result.videos)} videos: matched {c['matched']}, needs_review "
+            f"{c['needs_review']}, unmatched {c['unmatched']}, no_feed {c['no_feed']}"
+        )
+    ]
+    for v in result.videos:
+        if v.status in ("needs_review", "unmatched"):
+            target = f" -> {v.episode_title} (episode {v.episode_id})" if v.episode_id else ""
+            lines.append(
+                f"  {v.status}: {v.video_title}{target}: "
+                f"{_score_text(v.score, v.title_score, v.date_score, v.duration_score)}; {v.reason}"
+            )
+    if result.waiting:
+        lines.append("Channels waiting for a feed choice (run `resolve feeds`):")
+        for ch in result.waiting:
+            lines.append(f"  {ch.title} ({ch.channel_id}): {ch.video_count} video(s)")
+    if result.unavailable:
+        lines.append(f"Skipped {len(result.unavailable)} unavailable video(s).")
+    if result.missing:
+        lines.append(f"{len(result.missing)} video(s) are not in the database yet (run `fetch` first).")
+    if result.kept_reviewed:
+        lines.append(f"Kept {result.kept_reviewed} result(s) you already reviewed.")
+    for feed_id, new, truncated in result.feeds_refreshed:
+        lines.append(f"Feed {feed_id}: {new} new episode(s){' (list may be truncated)' if truncated else ''}")
+    calls = ", ".join(f"{m}: {n}" for m, n in sorted(result.calls.items())) or "none"
+    lines.append(f"Podcast Index calls: {calls}")
+    for warning in result.warnings:
+        lines.append(f"Warning: {warning}")
+    return "\n".join(lines)
+
+
+def cmd_resolve_feeds(args) -> int:
+    waiting = core.channels_needing_feed(_target_ids(args))
+    if not waiting:
+        print("Every channel already has a feed choice.")
+        return EXIT_OK
+    skipped = 0
+    for channel in waiting:
+        print(f"\nChannel: {channel.title} ({channel.channel_id}), {channel.video_count} video(s)")
+        for title in channel.sample_titles:
+            print(f"  for example: {title}")
+        candidates = core.find_feed_candidates(channel.channel_id)
+        if not candidates:
+            print("  No feeds were found under that name.")
+        for number, feed in enumerate(candidates, 1):
+            print(format_feed(number, feed))
+        while True:
+            answer = _ask("Pick a number, 'u' for a feed URL or ID, 'n' for no feed, 's' to skip: ").lower()
+            if answer == "s":
+                skipped += 1
+                break
+            if answer == "n":
+                core.set_channel_feed(channel.channel_id, "none")
+                print("  Saved: no feed for this channel.")
+                break
+            if answer == "u":
+                ref = _ask("Feed URL or Podcast Index ID: ")
+                if not ref:
+                    continue
+                try:
+                    feed = core.set_channel_feed(channel.channel_id, ref)
+                except (ConfigError, ApiError) as exc:
+                    _err(f"  {exc}")
+                    continue
+                print(f"  Saved: {feed.title if feed else 'no feed'}")
+                break
+            if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+                feed = core.set_channel_feed(channel.channel_id, str(candidates[int(answer) - 1].feed_id))
+                print(f"  Saved: {feed.title if feed else 'no feed'}")
+                break
+            print("  Please choose one of the options.")
+    return EXIT_PARTIAL if skipped else EXIT_OK
+
+
+def cmd_resolve_set_feed(args) -> int:
+    feed = core.set_channel_feed(args.channel_id, args.feed)
+    print(f"Saved: {feed.title}" if feed else "Saved: no feed for this channel.")
+    return EXIT_OK
+
+
+def cmd_resolve_run(args) -> int:
+    video_ids = _target_ids(args)
+    result = core.resolve_videos(
+        video_ids, refresh=not args.no_refresh, full_refresh=args.full_refresh
+    )
+    print(format_resolve(result))
+    if args.seed is not None:
+        rows = core.write_seed_check(args.seed, SEED_CHECK_PATH)
+        print(f"Wrote {SEED_CHECK_PATH} ({rows} rows)")
+    attention = result.partial or result.counts["needs_review"] or result.waiting or result.missing
+    return EXIT_PARTIAL if attention else EXIT_OK
+
+
+def cmd_resolve_review(args) -> int:
+    video_ids = _target_ids(args)
+    items = core.list_review_items(video_ids)
+    waiting = core.channels_needing_feed(video_ids)
+    if not items and not waiting:
+        print("Nothing to review.")
+        return EXIT_OK
+    for item in items:
+        print(f"{item['status']}: {item['video_title']} ({item['video_id']})")
+        print(f"  {_score_text(item['score'], item['title_score'], item['date_score'], item['duration_score'])}; "
+              f"{item['reason']}")
+        for rank, cand in enumerate(item["candidates"], 1):
+            print(f"  {rank}. episode {cand['episode_id']}: {cand['title']} "
+                  f"(score {cand['combined']:.2f})")
+    for ch in waiting:
+        print(f"Waiting for a feed choice: {ch.title} ({ch.channel_id}), {ch.video_count} video(s)")
+    return EXIT_OK
+
+
+def cmd_resolve_confirm(args) -> int:
+    v = core.confirm_match(args.video_id, args.episode_id)
+    print(f"Confirmed: {v.video_title} -> {v.episode_title}")
+    return EXIT_OK
+
+
+def cmd_resolve_reject(args) -> int:
+    v = core.reject_match(args.video_id)
+    print(f"Rejected: {v.video_title} has no matching episode.")
+    return EXIT_OK
+
+
 # ---------------------------------------------------------------------------- parser
 
 
@@ -219,6 +384,35 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("purge", cmd_purge, "Delete stale video rows that nothing refers to.", user=False)
     p.add_argument("--days", type=int, default=None,
                    help="age limit in days (default: PODCAST_RECALL_VIDEO_REFRESH_DAYS or 30)")
+    resolve = sub.add_parser("resolve", help="Match YouTube videos to podcast episodes.")
+    rsub = resolve.add_subparsers(dest="command", required=True)
+
+    def radd(name: str, func, help_text: str, *, seed: bool = True, user: bool = True):
+        sp = rsub.add_parser(name, help=help_text, description=help_text)
+        sp.set_defaults(func=func)
+        if user:
+            sp.add_argument("--user", default=core.OWNER, help="local user name (default: owner)")
+        if seed:
+            sp.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
+                            help=f"work on the seed file's videos (default file: {DEFAULT_SEED})")
+        return sp
+
+    radd("feeds", cmd_resolve_feeds, "Choose a podcast feed for each channel (asks questions).")
+    p = radd("set-feed", cmd_resolve_set_feed, "Set a channel's feed without questions.",
+             seed=False, user=False)
+    p.add_argument("channel_id")
+    p.add_argument("feed", help="a feed URL, a Podcast Index feed ID, or 'none'")
+    p = radd("run", cmd_resolve_run, "Match videos to episodes and print a summary.")
+    p.add_argument("--no-refresh", action="store_true", help="use the episodes already stored")
+    p.add_argument("--full-refresh", action="store_true", help="fetch every episode again")
+    radd("review", cmd_resolve_review, "List results that need a human look.")
+    p = radd("confirm", cmd_resolve_confirm, "Say that an episode is right for a video.",
+             seed=False, user=False)
+    p.add_argument("video_id")
+    p.add_argument("episode_id", type=int)
+    p = radd("reject", cmd_resolve_reject, "Say that a video has no matching episode.",
+             seed=False, user=False)
+    p.add_argument("video_id")
     return parser
 
 

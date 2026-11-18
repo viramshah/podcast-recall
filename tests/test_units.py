@@ -305,7 +305,8 @@ class Migrations(Base):
             store._migration_files = original
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertNotIn("half_done", tables)
-        self.assertEqual(conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0], 1)
+        latest = max(v for v, _name, _sql in original())
+        self.assertEqual(conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0], latest)
         conn.close()
 
     def test_backups_use_a_consistent_copy(self):
@@ -316,11 +317,11 @@ class Migrations(Base):
         original = store._migration_files
         try:
             store._migration_files = lambda: original() + [
-                (2, "002_extra.sql", "CREATE TABLE extra (a);")]
+                (99, "099_extra.sql", "CREATE TABLE extra (a);")]
             store.migrate(conn, backups)
         finally:
             store._migration_files = original
-        backup = next(backups.glob("podcast_recall-v1-*.db"))
+        backup = next(backups.glob("podcast_recall-v*.db"))
         copy = sqlite3.connect(str(backup))
         self.assertEqual(copy.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
         copy.close()

@@ -119,3 +119,69 @@ class RevokeResult:
 class PurgeResult:
     deleted: int
     kept: int
+
+
+@dataclass(frozen=True)
+class FeedInfo:
+    feed_id: int
+    title: str = ""
+    url: str = ""
+    author: str = ""
+    language: str = ""
+    episode_count: int | None = None
+    last_update: int | None = None
+
+
+@dataclass(frozen=True)
+class EpisodeInfo:
+    episode_id: int
+    feed_id: int
+    guid: str
+    title: str
+    published: int | None
+    duration_s: int | None
+    audio_url: str = ""
+    audio_type: str = ""
+    transcript_url: str | None = None
+    transcripts: list = field(default_factory=list)
+    link: str = ""
+
+
+@dataclass
+class ResolvedVideo:
+    video_id: str
+    video_title: str
+    status: str
+    method: str = ""
+    reason: str = ""
+    episode_id: int | None = None
+    episode_title: str = ""
+    score: float | None = None
+    title_score: float | None = None
+    date_score: float | None = None
+    duration_score: float | None = None
+    duration_diff_s: int | None = None
+    margin: float | None = None
+    reviewed: bool = False
+
+
+@dataclass(frozen=True)
+class ChannelNeedingFeed:
+    channel_id: str
+    title: str
+    video_count: int
+    sample_titles: tuple[str, ...] = ()
+
+
+@dataclass
+class ResolveResult:
+    counts: dict[str, int]
+    videos: list[ResolvedVideo]
+    waiting: list[ChannelNeedingFeed]
+    unavailable: list[str]
+    missing: list[str]
+    kept_reviewed: int
+    feeds_refreshed: list[tuple[int, int, bool]]  # (feed id, new episodes, truncated)
+    calls: dict[str, int]
+    warnings: list[str]
+    partial: bool = False

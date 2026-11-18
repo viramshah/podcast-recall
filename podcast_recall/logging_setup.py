@@ -12,6 +12,11 @@ from pathlib import Path
 _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*)(?:bearer\s+)?[^\s,;\"']+"), r"\1[REDACTED]"),
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"), "Bearer [REDACTED]"),
+    (re.compile(r"(?i)(x-auth-key[\"']?\s*[:=]\s*)[^\s,;\"']+"), r"\1[REDACTED]"),
+    (
+        re.compile(r"(?i)(podcastindex_(?:key|secret)[\"']?\s*[=:]\s*[\"']?)[^\s,;\"']+"),
+        r"\1[REDACTED]",
+    ),
     (
         re.compile(
             r"(?i)((?:access_token|refresh_token|id_token|client_secret|token|code)"

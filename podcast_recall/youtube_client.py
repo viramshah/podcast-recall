@@ -26,10 +26,10 @@ from podcast_recall.errors import (
     TransientError,
 )
 from podcast_recall.models import ChannelInfo, MyChannel, PlaylistInfo, VideoInfo
+from podcast_recall.retry import call_with_retries
 
 SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
 REQUEST_TIMEOUT_S = 30
-RETRY_DELAYS = (1, 2, 4, 8, 16)  # seconds; up to 5 retries after the first attempt
 BATCH_SIZE = 50
 DESCRIPTION_LIMIT = 500
 _QUOTA_REASONS = {"quotaExceeded", "dailyLimitExceeded"}
@@ -45,27 +45,6 @@ def parse_iso8601_duration(text: str | None) -> int:
         return 0
     days, hours, minutes, seconds = (int(g) if g else 0 for g in match.groups())
     return ((days * 24 + hours) * 60 + minutes) * 60 + seconds
-
-
-def call_with_retries(
-    fn: Callable[[], object],
-    *,
-    sleep: Callable[[float], None] = time.sleep,
-    rng: Callable[[], float] = random.random,
-    delays: tuple[int, ...] = RETRY_DELAYS,
-):
-    """Call `fn`, retrying only on TransientError with the given delays plus jitter."""
-    retries = 0
-    while True:
-        try:
-            return fn()
-        except TransientError as exc:
-            if retries >= len(delays):
-                raise ApiError(
-                    f"YouTube kept failing after {retries + 1} attempts ({exc})."
-                ) from exc
-            sleep(delays[retries] * (0.5 + rng()))
-            retries += 1
 
 
 class YouTubeClient(ABC):

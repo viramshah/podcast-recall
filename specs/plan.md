@@ -54,6 +54,8 @@ Consequences of the web-chat front end (D7, D8):
 | D11 | Which languages are in scope for v1 (**open**) | (a) English only for the 90% gate. (b) Include Hindi and Hinglish episodes. | (a). Check transcript quality on a Raj Shamani episode in Week 1 before deciding about those 4 seed episodes. |
 | D12 | Where runtime data lives (**decided Nov 17, 2026**) | (a) One folder outside the repo, `~/.podcast-recall/`. (b) Inside the repo's `data/`. | (a). Keeps personal library data, transcripts and audio out of git. |
 | D13 | Where transcripts come from (**decided Nov 17, 2026**) | (a) Always run Whisper. (b) Use the publisher's transcript file when one exists, Whisper otherwise. | (b) chosen: publisher transcript first, Whisper as the fallback. About 95% of Lenny's and 49% of Startup Ideas episodes have one; none of Raj Shamani's do. The side-by-side comparison stays as a check during U3 validation. |
+| D14 | Matching rule values for U2 (**provisionally decided Nov 17, 2026**) | Starting values in the U2 spec | Tune on the seed run, then record the final values and reasons. |
+| D15 | Transcript quality thresholds for U3 (**open**) | Starting values in the U3 spec | Tune on the seed run, then record the final values and reasons. |
 
 ## 3. Week 0: Setup (click-by-click)
 

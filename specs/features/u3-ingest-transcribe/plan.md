@@ -1,35 +1,48 @@
-# U3: Ingest and Transcribe, Plan (v1, 2026-11-17)
+# U3: Ingest and Transcribe, Plan (v2, 2026-11-17)
 
 ## Approach
-1. **Dependencies.** Reuse `mlx-whisper` (already in `pyproject.toml`) and the HTTP client added in U2. Use `ffprobe` (from the installed `ffmpeg`) to read audio duration, as `scripts/transcribe_test.py` does.
-2. **`jobs.py`.** The queue on SQLite: add, claim, update state, retry with backoff, and recover jobs left in `downloading` or `transcribing` after a crash by returning them to `queued`. A lock file ensures only one worker runs.
-3. **`download.py`.** Download with the limits in the requirements (600 MB, 15 s connect, 30 min total, 5 redirects), check the content type, write to a temporary name and rename on success. Delete partial files on failure. Resolve the host after each redirect and refuse loopback, link-local and private addresses.
-3b. **`publisher.py`.** Decided in D13. Downloads an episode's publisher transcript (a `.vtt` file, using the same download safety rules), parses its timed cues into the same structure Whisper produces (with `chunk` timing detail), and runs the publisher-transcript quality checks. Pure parsing functions, no database access. If anything fails, the caller falls back to Whisper.
-4. **`transcribe.py`.** Wraps `mlx-whisper` (model name from configuration) and returns a structure of segments and words. Starts from `scripts/transcribe_test.py`, but the output format is new: that script writes a flat word list, while U3 stores segments that each contain words. No database access.
-5. **`quality.py`.** Pure functions for the quality checks (duration match, words per minute, gaps, language). Easy to unit test.
-6. **`transcripts.py`.** Writes the JSON file atomically, then the `transcripts` row. Reads for `get_transcript`.
-7. **`store.py`.** Add `jobs` and `transcripts` tables, with a migration.
-8. **`core.py` and `cli.py`.** Core functions as listed in the requirements. The CLI only calls them. `transcribe run --overnight` runs until the queue is empty and prints a summary.
-9. **Tests.** Queue tests (crash recovery, retries, one worker), quality-check tests, and download tests with a local fake server (404, wrong content type, oversized file). A very short real audio clip tests the Whisper wrapper end to end.
+1. **Start from a merged U2.** Create `feature/u3-ingest-transcribe` from `main` after U2 is merged. U3 reads U2's `episodes` and `episode_matches`.
+2. **No new dependencies.** `mlx-whisper` is already in `pyproject.toml`. Use `ffprobe` (from `ffmpeg`, already installed) through `subprocess`, as `scripts/transcribe_test.py` does. HTTP uses `urllib`, as in U2.
+3. **`net.py`: safe downloads.** One place for every download. A custom redirect handler that checks the host at each hop (and refuses loopback, private, link-local, multicast and reserved addresses, and URLs with credentials), a redirect limit of 5, size limits, a time limit and streaming to a `.part` file with a running size count. The host-resolving function is injectable so tests use a fake resolver and a local fake server. Never logs full URLs with query strings.
+4. **`publisher.py`.** Pick a supported transcript entry (VTT, SRT; by stored type, then extension), download it through `net.py`, parse the cues into the transcript structure, and keep the raw file. Pure parsing functions. Reuse the cue-parsing approach from `scripts/compare_transcripts.py`, extended for SRT, entities, merged duplicate cues and speakers.
+5. **`audio.py`.** Disk-space check, the audio download through `net.py`, and the `ffprobe` check (audio stream present, duration above 0). The `ffprobe` call is injectable.
+6. **`whisper_runner.py`.** Wraps `mlx-whisper` with the settings in the requirements, returning segments with words and the detected language. The Whisper call is injectable, so tests never load a model. One optional real-model test, skipped unless `mlx_whisper` is installed and `RUN_WHISPER_TEST=1`.
+7. **`quality.py`.** Pure functions and one constants block for the checks and flags in the requirements.
+8. **`transcripts.py`.** Build the transcript structure, write the JSON and raw files atomically (temporary name, then rename), write the `transcripts` row, and read a transcript back for `get_transcript` and `show`.
+9. **`jobs.py`.** The queue: enqueue, choose due jobs in the required order, claim, record success or failure with the not-before times, crash recovery, and the `status` counts. The global lock reuses U1's `SyncLock` with a different file.
+10. **`transcribe_flow.py`.** `process_job`: the publisher-first, Whisper-fallback logic from the requirements, with each step and each fallback reason recorded.
+11. **Migration `003_transcripts.sql`** for `jobs` and `transcripts`, with foreign keys to `episodes`.
+12. **`core.py` and `cli.py`.** The functions and commands in the requirements. The CLI only calls the core functions. Progress goes through a callback to standard error, results to standard output.
+13. **README.** Document the two settings and the `caffeinate` tip.
+14. **Tests.**
+    - Publisher parsing with realistic VTT and SRT samples (multi-line cues, identifiers, `NOTE` blocks, tags, entities, speakers, repeated cues, backwards times, hours-less timestamps).
+    - Quality checks, one test per rule and per flag.
+    - `net.py`: a redirect to `localhost` or a private address is refused at the first and the second hop, credentials in a URL are refused, oversized and slow downloads are cut off, content types are handled.
+    - Queue: order, attempts and not-before times, crash recovery (an exception mid-job, then a new run), one worker at a time, two videos sharing one episode, enqueue only `matched`.
+    - Flow: publisher success downloads no audio; a missing or broken or implausible publisher file falls back with the reason recorded; Whisper success deletes the audio unless `--keep-audio`; a Whisper check failure gives `needs_review`; language mismatch is flagged; `retry --whisper` and `accept`.
+    - Transcript file: atomic write, schema, `show` windows.
+    - CLI: exit codes, filters, output. An end-to-end test through the real commands with a fake network and a fake Whisper.
 
 ## Constraints
-- No secrets in code, logs or git. Audio and transcripts live in the data folder (`~/.podcast-recall/audio/` and `transcripts/`, D12), outside the repo. Use the path helper from U1 (`paths.py`).
-- One transcription at a time. Never run it in parallel with another job.
-- Download only `http` and `https` URLs. Never run downloaded content as code.
-- Write results atomically (temporary name, then rename), so a crash never leaves a half-written transcript that looks finished.
-- `core.py` has no user-facing printing.
+- No secrets in code, logs or git. Audio and transcripts live in the data folder (D12), never in the repo. Use `paths.py`.
+- Every download goes through `net.py`.
+- One transcription at a time, enforced by the lock.
+- Write results atomically so a crash never leaves a half-written transcript that looks finished.
+- `core.py` has no printing.
+- The matcher, the resolver and U1 are not changed by U3, except for the migration.
 
 ## Review checklist (PM)
-- [ ] Killing the process mid-job and restarting resumes cleanly with no duplicate or half-finished transcript
-- [ ] Only one worker can run at a time
-- [ ] Failed jobs show the reason in `transcribe status`, after 3 attempts
-- [ ] Every transcript has per-word start and end times, model name, language and duration
-- [ ] Quality flags are stored, and a failed check marks `needs_review` instead of passing silently
-- [ ] Audio is deleted after success unless the keep flag is set
-- [ ] Unmatched, no-feed and unconfirmed `needs_review` videos are never downloaded, and appear as `not_indexable` without a job row
-- [ ] A download that redirects to `localhost` or a private address is refused (tested with a fake server)
-- [ ] An episode with a transcript link uses the publisher transcript, downloads no audio and records `source = publisher`
-- [ ] A missing, broken or implausible transcript file falls back to Whisper and records why
-- [ ] Every transcript records its source and its timing detail (`chunk` or `word`)
-- [ ] No secrets or full transcripts in git or logs
+- [ ] Killing the process mid-job and restarting resumes cleanly: no duplicate and no half-written file, and the attempt count is not used up by the crash
+- [ ] Only one worker can run at a time, and a killed worker leaves no stuck lock
+- [ ] Only `matched` episodes are enqueued, and `not_indexable` videos have no job row
+- [ ] A failed job shows its reason in `transcribe status` after 3 attempts, and `retry` gives it a fresh start
+- [ ] A download that redirects to `localhost` or a private address is refused at every hop, tested with a fake server
+- [ ] An episode with a good transcript link uses the publisher transcript, downloads no audio and records `source = publisher` and `timing_detail = chunk`
+- [ ] A missing, broken, implausible or unsupported publisher file falls back to Whisper and records the reason
+- [ ] Every Whisper transcript has word times, and every transcript records its source, model, language, timing detail and duration
+- [ ] A transcript that fails a Whisper check is stored as `needs_review` with its flags, and is not `ok` until `transcribe accept`
+- [ ] The language is detected, not forced to English, and a mismatch with the feed language is flagged
+- [ ] The raw publisher file is kept, and audio is deleted after success unless `--keep-audio`
+- [ ] The transcript JSON matches the contract in the requirements
+- [ ] No secrets or full transcripts in git or logs, and URLs with tokens are redacted in logs
 - [ ] Nothing added beyond the spec (no chunking, no search, no diarization)

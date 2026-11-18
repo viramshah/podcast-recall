@@ -50,6 +50,10 @@ def lock_path(user_id: str) -> Path:
     return data_home() / f"sync-{user_id}.lock"
 
 
+def podcastindex_env_path() -> Path:
+    return data_home() / "podcastindex.env"
+
+
 def client_secret_path() -> Path:
     return Path(os.environ.get("CLIENT_SECRET_PATH") or DEFAULT_CLIENT_SECRET).expanduser()
 
