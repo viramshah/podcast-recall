@@ -36,8 +36,9 @@ Branch: `feature/u4-index-retrieval` (from `main` after U3 was merged). Depends 
 
 ### Search
 `search_episodes(query, user_id, filters, limit)` returns hits, best first.
-- **Scope:** only episodes that have a `matched` result for a video in this user's library. `needs_review` and `unmatched` results are excluded.
+- **Scope:** only episodes that have a `matched` result for a video in this user's library. For development and validation, an explicit list of videos (the seed file) can be given instead (`--seed`); the same `matched`-only rule and filters apply, but library membership is not required (found during validation on 2026-11-18: the seed episodes are not all in the PM's YouTube library). `needs_review` and `unmatched` results are excluded.
 - **Query text:** all words are plain words. Text in double quotes is an exact phrase. No raw operators (`AND`, `OR`, `*`, `NEAR`) are passed to FTS5.
+- **Candidates:** 30 from each method. If the per-episode cap then leaves fewer than `limit` results, the candidate lists are widened (doubling, up to 480) so one long episode cannot starve the rest.
 - **How many:** `limit` defaults to 8 and is at most 50. At most **3 chunks per episode** are returned by default (`per_episode` can change it), so one long episode does not fill the list.
 - **Filters:** show, date range (`since`, `until`, by episode publish date), and specific episode IDs. A show is matched by name: a case-insensitive part of the show's title. If it matches more than one show, the search stops with an error that lists them. "Platform" is always YouTube in v1. "Played status" is ignored (D4).
 - **Each hit:** chunk ID, episode ID, show, episode title, `start_s`, `end_s`, text, speaker, a YouTube link of the form `https://youtu.be/<video id>?t=<chunk start in whole seconds>`, and the scores (keyword rank, vector rank, fused score, rerank score if any).

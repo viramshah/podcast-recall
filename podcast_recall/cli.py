@@ -473,9 +473,10 @@ def cmd_index_status(args) -> int:
 
 
 def cmd_search(args) -> int:
+    video_ids = _target_ids(args) if args.seed is not None else None
     result = core.search_episodes(
         args.query, args.user, show=args.show, since=args.since, until=args.until,
-        limit=args.limit,
+        video_ids=video_ids, limit=args.limit,
     )
     for warning in result.warnings:
         _err(f"Warning: {warning}")
@@ -625,6 +626,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--since", help="only episodes published on or after YYYY-MM-DD")
     p.add_argument("--until", help="only episodes published on or before YYYY-MM-DD")
     p.add_argument("--limit", type=int, default=8, help="how many results (1 to 50, default 8)")
+    p.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
+                   help=f"search the seed file's episodes instead of your library (default file: {DEFAULT_SEED})")
     p.add_argument("--explain", action="store_true", help="show the scores behind each result")
     return parser
 

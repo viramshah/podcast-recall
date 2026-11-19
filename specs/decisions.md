@@ -94,3 +94,4 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 
 ### D17: U4 retrieval
 - Open checks: does `nomic-embed-text` retrieve the four Raj Shamani episodes as well as the others (D11)? Does recall@5 reach 85% on the probe set without a reranker? _TBD after U4 validation_
+- Early evidence (2026-11-18): on the seed episodes, relevant chunks had a meaning distance of about 0.30 to 0.33 and loosely related ones about 0.39 to 0.41. Starting guess for U6's abstention threshold: 0.35, to be tuned on the Week 2 golden set.

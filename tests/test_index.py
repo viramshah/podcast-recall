@@ -834,3 +834,97 @@ class ProbeScoring(IndexBase):
         self.assertGreaterEqual(len(rows), 10)
         self.assertTrue(all(r.gold_s > 0 for r in rows))
         self.assertGreaterEqual(sum(1 for r in rows if r.tag == "raj"), 3)
+
+
+# ---------------------------------------------------------------------------- explicit scope and starvation
+
+
+class ExplicitScope(IndexBase):
+    """`video_ids` searches exactly those videos' episodes, even when they are not in the library."""
+
+    def setUp(self):
+        super().setUp()
+        self.world.add_episode(201, 1, "In the library", "2026-10-01T10:00:00", KUBE)
+        self.world.add_episode(202, 2, "Seed only", "2026-10-02T10:00:00", BREAD, users=())
+        self.world.add_episode(203, 2, "Neither", "2026-10-03T10:00:00", RUN, users=())
+        self.build()
+
+    def test_the_library_scope_does_not_see_episodes_outside_it(self):
+        self.assertNotIn(202, self.ids(self.find("sourdough")))
+
+    def test_an_explicit_list_searches_exactly_those_episodes(self):
+        result = self.find("sourdough", video_ids=["vid00000202"])
+        self.assertEqual(self.ids(result), {202})
+        self.assertEqual(result.hits[0].url, "https://youtu.be/vid00000202?t=0")
+
+    def test_an_explicit_list_does_not_leak_other_episodes(self):
+        for query in ("sourdough", "kubernetes", "marathon", "automobile"):
+            self.assertLessEqual(self.ids(self.find(query, video_ids=["vid00000202"])), {202})
+            self.assertLessEqual(self.ids(self.find(query, video_ids=["vid00000201", "vid00000203"])), {201, 203})
+
+    def test_an_explicit_list_still_needs_matched_episodes_and_filters_still_apply(self):
+        self.world.add_episode(204, 2, "Needs review", "2026-10-04T10:00:00", ["Findable platypus words."],
+                               users=(), match="needs_review")
+        self.build()
+        self.assertEqual(self.ids(self.find("platypus", video_ids=["vid00000204"])), set())
+        both = ["vid00000201", "vid00000202"]
+        self.assertEqual(self.ids(self.find("morning", video_ids=both, show="greg")), {202})
+        self.assertEqual(self.ids(self.find("morning", video_ids=both, until="2026-10-01")), {201})
+
+    def test_an_empty_or_unknown_list_finds_nothing(self):
+        self.assertEqual(self.find("sourdough", video_ids=[]).hits, [])
+        self.assertEqual(self.find("sourdough", video_ids=["doesnotexist"]).hits, [])
+
+    def test_the_cli_seed_flag_searches_the_seed_file(self):
+        import contextlib
+        import io
+        import os
+        import tempfile
+        from pathlib import Path
+
+        file_conn = store.connect(paths.db_path(), paths.backup_dir())
+        self.addCleanup(file_conn.close)
+        store.upsert_user(file_conn, "owner", "UCme", "Me", T0)
+        world = World(file_conn)
+        world.add_episode(301, 2, "Seed only", "2026-10-02T10:00:00", BREAD, users=())
+        indexer.build_index(file_conn, self.services, now=self.now)
+        file_conn.commit()
+        seed = Path(tempfile.mkdtemp()) / "seed.csv"
+        self.addCleanup(__import__("shutil").rmtree, seed.parent, True)
+        seed.write_text("youtube_url\nhttps://www.youtube.com/watch?v=vid00000301\n", encoding="utf-8")
+        self.addCleanup(os.environ.pop, "PODCAST_RECALL_OLLAMA_URL", None)
+        os.environ["PODCAST_RECALL_OLLAMA_URL"] = "http://127.0.0.1:9"
+        outputs = []
+        for args in (["search", "sourdough"], ["search", "sourdough", "--seed", str(seed)]):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                cli_main(args)
+            outputs.append(out.getvalue())
+        self.assertIn("No results.", outputs[0])
+        self.assertIn("Seed only", outputs[1])
+        self.assertIn("https://youtu.be/vid00000301?t=0", outputs[1])
+
+
+class Starvation(IndexBase):
+    """One long episode must not fill the candidate lists and leave the others out."""
+
+    def test_the_per_episode_cap_does_not_starve_the_result_list(self):
+        quokkas = [f"Quokkas are small and quokkas are friendly, fact {i}." for i in range(700)]
+        self.world.add_episode(401, 1, "All about quokkas", "2026-10-01T10:00:00", quokkas)
+        self.world.add_episode(402, 2, "A short mention", "2026-10-02T10:00:00",
+                               ["Someone once mentioned quokkas briefly.", "Then we moved on."])
+        self.world.add_episode(403, 2, "Another mention", "2026-10-03T10:00:00",
+                               ["A quokkas aside in a long chat.", "Then back to work."])
+        self.build()
+        self.assertGreater(self.chunk_count(401), retrieval.CANDIDATES * 1.5)
+        for vectors_on in (False, True):
+            hits = self.find("quokkas", limit=8, use_vectors=vectors_on).hits
+            self.assertEqual(len([h for h in hits if h.episode_id == 401]), retrieval.DEFAULT_PER_EPISODE)
+            self.assertIn(402, {h.episode_id for h in hits})
+            self.assertIn(403, {h.episode_id for h in hits})
+
+    def test_widening_stops_when_the_scope_is_exhausted(self):
+        self.world.add_episode(405, 1, "Tiny", "2026-10-01T10:00:00", ["Only one quokkas sentence here."])
+        self.build()
+        result = self.find("quokkas", limit=8)
+        self.assertEqual(len(result.hits), 1)

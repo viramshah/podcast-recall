@@ -539,19 +539,21 @@ def search_episodes(
     since: str | None = None,
     until: str | None = None,
     episode_ids=None,
+    video_ids=None,
     limit: int = retrieval.DEFAULT_LIMIT,
     per_episode: int = retrieval.DEFAULT_PER_EPISODE,
     services: indexer.IndexServices | None = None,
     conn=None,
 ):
-    """The best chunks for a query, from this user's library only."""
+    """The best chunks for a query, from this user's library only. With `video_ids` the search
+    covers exactly those videos' episodes instead (used for the seed list and the probe set)."""
     auth.validate_user_id(user_id)
     with _Db(conn) as db:
         _require_user(db, user_id)
         services = services or indexer.IndexServices()
         return retrieval.find(
             db, services.get_embedder(), query, user_id, show=show, since=since, until=until,
-            episode_ids=episode_ids, limit=limit, per_episode=per_episode,
+            episode_ids=episode_ids, video_ids=video_ids, limit=limit, per_episode=per_episode,
             use_vectors=services.use_vectors,
         )
 

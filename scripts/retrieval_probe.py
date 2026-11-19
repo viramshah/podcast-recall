@@ -4,12 +4,14 @@ Usage:
     uv run python scripts/retrieval_probe.py [--probe FILE] [--user NAME] [--no-vectors] [--limit 10]
 
 Needs the index built (`podcast-recall index build --seed`) and, unless --no-vectors, Ollama running.
+By default the search covers the seed file's episodes (the probe questions are about those); use
+--library to search your own YouTube library instead.
 Run it with and without --no-vectors to see what meaning search adds.
 """
 
 import argparse
 
-from podcast_recall import core, indexer, probe
+from podcast_recall import core, ids, indexer, probe
 
 
 def main() -> int:
@@ -18,9 +20,14 @@ def main() -> int:
     parser.add_argument("--user", default=core.OWNER)
     parser.add_argument("--no-vectors", action="store_true", help="keyword search only")
     parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--seed", default="data/seed_episodes.csv",
+                        help="search the episodes of this seed file (default)")
+    parser.add_argument("--library", action="store_true",
+                        help="search your YouTube library instead of the seed file")
     args = parser.parse_args()
 
     rows = probe.load_probe(args.probe)
+    scope = None if args.library else ids.load_ids([args.seed])[0]
     services = indexer.IndexServices(use_vectors=not args.no_vectors)
     conn = core.open_db()
     outcomes: list[probe.ProbeOutcome] = []
@@ -36,7 +43,8 @@ def main() -> int:
                 problems += 1
                 continue
             result = core.search_episodes(
-                row.question, args.user, limit=args.limit, services=services, conn=conn
+                row.question, args.user, video_ids=scope, limit=args.limit, services=services,
+                conn=conn,
             )
             for warning in result.warnings[:1]:
                 print(f"warning: {warning}")

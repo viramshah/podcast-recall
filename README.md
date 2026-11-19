@@ -84,13 +84,14 @@ on a laptop, prefix with `caffeinate -i` so the Mac does not sleep.
 ```
 uv run podcast-recall index build --seed               # split transcripts into chunks and index them
 uv run podcast-recall index status --seed              # what is indexed and what is waiting
-uv run podcast-recall search "agent harness"           # best matches, with time and a YouTube link
+uv run podcast-recall search "agent harness"           # best matches in YOUR library, with time and a link
+uv run podcast-recall search "agent harness" --seed    # the same, over the seed file's episodes instead
 uv run podcast-recall search '"exact phrase"' --show lenny --since 2026-10-01 --explain
 ```
 
 Run `index build` after `transcribe run` (and after `transcribe accept`). It is safe to run again: only
 new or changed transcripts are indexed. Search combines keyword and meaning matching and only returns
-episodes in your own library. Words are plain words; text in double quotes is an exact phrase. Without
+episodes in your own library (or, with `--seed`, exactly the seed file's episodes, which may not be in your YouTube library). Words are plain words; text in double quotes is an exact phrase. Without
 Ollama running, `index build` stops with a clear message and `search` falls back to keywords.
 `--explain` shows the scores, including the meaning distance (0 is identical; larger is further away).
 

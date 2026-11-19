@@ -12,11 +12,12 @@ import sqlite3
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
-from podcast_recall import vectors
+from podcast_recall import jobs, vectors
 from podcast_recall.errors import ApiError, ConfigError
 from podcast_recall.models import SearchHit, SearchResult
 
 CANDIDATES = 30  # taken from each method before they are combined
+MAX_CANDIDATES = 480  # the most taken when the per-episode cap leaves too few results
 RRF_CONSTANT = 60
 DEFAULT_LIMIT = 8
 MAX_LIMIT = 50
@@ -65,8 +66,13 @@ def _date_epoch(value: str, *, end_of_day: bool) -> int:
     return int((day + timedelta(days=1)).timestamp()) - 1 if end_of_day else int(day.timestamp())
 
 
-def library_episode_ids(conn: sqlite3.Connection, user_id: str) -> list[int]:
-    """Episodes with a `matched` result for a video in this user's library."""
+def library_episode_ids(
+    conn: sqlite3.Connection, user_id: str, video_ids: Sequence[str] | None = None
+) -> list[int]:
+    """Episodes with a `matched` result for a video in this user's library. With `video_ids`, that
+    explicit list of videos is used instead of the library (for example the seed list)."""
+    if video_ids is not None:
+        return jobs.matched_episode_ids(conn, list(video_ids))
     rows = conn.execute(
         "SELECT DISTINCT m.episode_id FROM episode_matches m "
         "JOIN library_items li ON li.video_id = m.video_id "
@@ -101,9 +107,10 @@ def build_scope(
     since: str | None,
     until: str | None,
     episode_ids: Sequence[int] | None,
+    video_ids: Sequence[str] | None = None,
 ) -> int:
     """Fill the temporary `_scope` table with the chunk IDs the user may see. Returns the count."""
-    episodes = library_episode_ids(conn, user_id)
+    episodes = library_episode_ids(conn, user_id, video_ids)
     if episode_ids is not None:
         wanted = set(episode_ids)
         episodes = [e for e in episodes if e in wanted]
@@ -134,24 +141,24 @@ def build_scope(
 # ---------------------------------------------------------------------------- the two searches
 
 
-def keyword_search(conn: sqlite3.Connection, expression: str) -> list[int]:
+def keyword_search(conn: sqlite3.Connection, expression: str, k: int = CANDIDATES) -> list[int]:
     rows = conn.execute(
         "SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH ? "
         "AND rowid IN (SELECT chunk_id FROM _scope) ORDER BY rank LIMIT ?",
-        (expression, CANDIDATES),
+        (expression, k),
     )
     return [r[0] for r in rows]
 
 
 def vector_search(
-    conn: sqlite3.Connection, query_vector: Sequence[float]
+    conn: sqlite3.Connection, query_vector: Sequence[float], k: int = CANDIDATES
 ) -> list[tuple[int, float]]:
     """The nearest chunks inside the scope as (chunk id, cosine distance), nearest first. It always
     returns its nearest neighbours however far away they are; judging "too far" is U6's job."""
     rows = conn.execute(
         f"SELECT rowid, distance FROM {vectors.TABLE} WHERE embedding MATCH ? AND k = ? "
         "AND rowid IN (SELECT chunk_id FROM _scope) ORDER BY distance",
-        (vectors.encode(query_vector), CANDIDATES),
+        (vectors.encode(query_vector), k),
     )
     return [(r[0], r[1]) for r in rows]
 
@@ -173,56 +180,41 @@ def youtube_link(video_id: str, start_s: float) -> str:
     return f"https://youtu.be/{video_id}?t={int(start_s)}"
 
 
-def find(
+def _link_video(
+    conn: sqlite3.Connection, user_id: str, episode_id: int, video_ids: Sequence[str] | None
+) -> str | None:
+    """A video of this episode that the user may open: from the explicit list, else the library."""
+    if video_ids is not None:
+        allowed = set(video_ids)
+        rows = conn.execute(
+            "SELECT video_id FROM episode_matches WHERE status = 'matched' AND episode_id = ? "
+            "ORDER BY video_id",
+            (episode_id,),
+        )
+        return next((r[0] for r in rows if r[0] in allowed), None)
+    row = conn.execute(
+        "SELECT m.video_id FROM episode_matches m JOIN library_items li "
+        "ON li.video_id = m.video_id WHERE li.user_id = ? AND m.status = 'matched' "
+        "AND m.episode_id = ? ORDER BY m.video_id LIMIT 1",
+        (user_id, episode_id),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _build_hits(
     conn: sqlite3.Connection,
-    embedder,
-    query: str,
-    user_id: str,
+    ranked: Sequence[tuple[int, float]],
+    keyword: Sequence[int],
+    semantic: Sequence[tuple[int, float]],
     *,
-    show: str | None = None,
-    since: str | None = None,
-    until: str | None = None,
-    episode_ids: Sequence[int] | None = None,
-    limit: int = DEFAULT_LIMIT,
-    per_episode: int = DEFAULT_PER_EPISODE,
-    use_vectors: bool = True,
-) -> SearchResult:
-    if not 1 <= limit <= MAX_LIMIT:
-        raise ConfigError(f"limit must be between 1 and {MAX_LIMIT}.")
-    if per_episode < 1:
-        raise ConfigError("per_episode must be at least 1.")
-    phrases, words = parse_query(query)
-    expression = fts_expression(phrases, words)
-    if expression is None:
-        raise ConfigError("The search text has no words to look for.")
-    warnings: list[str] = []
-    scope_size = build_scope(
-        conn, user_id, show=show, since=since, until=until, episode_ids=episode_ids
-    )
-    if scope_size == 0:
-        return SearchResult([], False, warnings)
-
-    keyword = keyword_search(conn, expression)
-
-    semantic: list[tuple[int, float]] = []
-    vectors_used = False
-    if use_vectors:
-        if not vectors.load(conn) or not vectors.table_exists(conn):
-            warnings.append("Meaning search is not available yet (run `index build`). Using keywords only.")
-        else:
-            try:
-                semantic = vector_search(conn, embedder.embed_query(embedding_text(query)))
-                vectors_used = True
-            except ApiError as exc:
-                warnings.append(f"Meaning search is unavailable ({exc}). Using keywords only.")
-            except ConfigError as exc:
-                warnings.append(f"Meaning search is unavailable ({exc}). Using keywords only.")
-
-    ranked = fuse(keyword, [c for c, _ in semantic])
+    user_id: str,
+    video_ids: Sequence[str] | None,
+    limit: int,
+    per_episode: int,
+) -> list[SearchHit]:
     keyword_rank = {c: i for i, c in enumerate(keyword, 1)}
     vector_rank = {c: i for i, (c, _d) in enumerate(semantic, 1)}
     vector_distance = dict(semantic)
-
     hits: list[SearchHit] = []
     seen_per_episode: dict[int, int] = {}
     video_for: dict[int, str | None] = {}
@@ -240,13 +232,7 @@ def find(
             continue
         seen_per_episode[episode_id] = seen_per_episode.get(episode_id, 0) + 1
         if episode_id not in video_for:
-            link_row = conn.execute(
-                "SELECT m.video_id FROM episode_matches m JOIN library_items li "
-                "ON li.video_id = m.video_id WHERE li.user_id = ? AND m.status = 'matched' "
-                "AND m.episode_id = ? ORDER BY m.video_id LIMIT 1",
-                (user_id, episode_id),
-            ).fetchone()
-            video_for[episode_id] = link_row[0] if link_row else None
+            video_for[episode_id] = _link_video(conn, user_id, episode_id, video_ids)
         video_id = video_for[episode_id]
         hits.append(
             SearchHit(
@@ -260,7 +246,66 @@ def find(
         )
         if len(hits) >= limit:
             break
-    return SearchResult(hits, vectors_used, warnings)
+    return hits
+
+
+def find(
+    conn: sqlite3.Connection,
+    embedder,
+    query: str,
+    user_id: str,
+    *,
+    show: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    episode_ids: Sequence[int] | None = None,
+    video_ids: Sequence[str] | None = None,
+    limit: int = DEFAULT_LIMIT,
+    per_episode: int = DEFAULT_PER_EPISODE,
+    use_vectors: bool = True,
+) -> SearchResult:
+    """Search the user's library, or, with `video_ids`, exactly those videos' episodes instead."""
+    if not 1 <= limit <= MAX_LIMIT:
+        raise ConfigError(f"limit must be between 1 and {MAX_LIMIT}.")
+    if per_episode < 1:
+        raise ConfigError("per_episode must be at least 1.")
+    phrases, words = parse_query(query)
+    expression = fts_expression(phrases, words)
+    if expression is None:
+        raise ConfigError("The search text has no words to look for.")
+    warnings: list[str] = []
+    scope_size = build_scope(
+        conn, user_id, show=show, since=since, until=until, episode_ids=episode_ids,
+        video_ids=video_ids,
+    )
+    if scope_size == 0:
+        return SearchResult([], False, warnings)
+
+    query_vector: list[float] | None = None
+    if use_vectors:
+        if not vectors.load(conn) or not vectors.table_exists(conn):
+            warnings.append("Meaning search is not available yet (run `index build`). Using keywords only.")
+        else:
+            try:
+                query_vector = embedder.embed_query(embedding_text(query))
+            except (ApiError, ConfigError) as exc:
+                warnings.append(f"Meaning search is unavailable ({exc}). Using keywords only.")
+
+    # Take a few candidates from each method. If the per-episode cap then leaves too few results
+    # (one episode filling the lists), take more, up to a fixed ceiling.
+    k = CANDIDATES
+    while True:
+        keyword = keyword_search(conn, expression, k)
+        semantic = vector_search(conn, query_vector, k) if query_vector is not None else []
+        hits = _build_hits(
+            conn, fuse(keyword, [c for c, _ in semantic]), keyword, semantic,
+            user_id=user_id, video_ids=video_ids, limit=limit, per_episode=per_episode,
+        )
+        exhausted = len(keyword) < k and (query_vector is None or len(semantic) < k)
+        if len(hits) >= limit or exhausted or k >= MAX_CANDIDATES:
+            break
+        k = min(k * 2, MAX_CANDIDATES)
+    return SearchResult(hits, query_vector is not None, warnings)
 
 
 def get_chunk(conn: sqlite3.Connection, chunk_id: int) -> sqlite3.Row | None:
