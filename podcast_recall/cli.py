@@ -10,7 +10,18 @@ import argparse
 import sys
 from datetime import datetime
 
-from podcast_recall import core, ids, logging_setup, paths
+from podcast_recall import (
+    agreement,
+    answers,
+    core,
+    evalrun,
+    golden,
+    ids,
+    indexer,
+    logging_setup,
+    oracle,
+    paths,
+)
 from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, PodcastRecallError
 from podcast_recall.models import FeedInfo, FetchResult, ResolveResult, SyncResult
 
@@ -504,6 +515,96 @@ def cmd_search(args) -> int:
     return EXIT_OK
 
 
+# ---------------------------------------------------------------------------- evaluation
+
+
+GOLDEN_PATH = "data/golden/golden_v0.csv"
+LIBRARY_PATH = "data/golden/eval_library.csv"
+SHEET_PATH = "data/golden/labelling_sheet.csv"
+
+
+def _golden_and_library(args):
+    return golden.load_golden(args.golden), golden.load_library(args.library)
+
+
+def cmd_eval_run(args) -> int:
+    items, library = _golden_and_library(args)
+    raw = answers.load_answers(args.answers) if args.answers else None
+    grades = core.run_eval(
+        items, library, answers=raw, use_oracle=args.oracle, fabricate=args.fabricate, split=args.split
+    )
+    print(evalrun.format_summary(evalrun.summarize(grades)))
+    failing = [g for g in grades if not g.passed]
+    for grade in failing[:15]:
+        print(f"\n{grade.item_id} ({grade.type}) failed: {', '.join(grade.rules_failed)}")
+        for failure in grade.failures[:3]:
+            print(f"  {failure.rule} [{failure.severity}]: {failure.reason}")
+    if len(failing) > 15:
+        print(f"\n... and {len(failing) - 15} more (see the scorecard file)")
+    if args.out:
+        evalrun.write_scorecard(args.out, grades)
+        print(f"\nWrote {args.out}")
+    return EXIT_PARTIAL if failing else EXIT_OK
+
+
+def cmd_eval_retrieval(args) -> int:
+    items, library = _golden_and_library(args)
+    services = indexer.IndexServices(use_vectors=not args.no_vectors)
+    outcomes = core.eval_retrieval(items, library, split=args.split, services=services)
+    s = evalrun.retrieval_summary(outcomes)
+    print(f"Questions with a gold time (single-fact, who/when): {s['timed_n']}")
+    print(f"Recall@5:  {s['recall_at_5']:.0%}   (target 85%)")
+    print(f"Recall@10: {s['recall_at_10']:.0%}")
+    print(f"MRR:       {s['mrr']:.2f}")
+    for kind, row in s["by_type"].items():
+        print(f"  {kind:<12} recall@5 {row['recall_at_5']:.0%} on {row['n']}")
+    if s["synthesis_episode_recall"] is not None:
+        print(f"Synthesis episode coverage in the top 5: {s['synthesis_episode_recall']:.0%} on {s['synthesis_n']}")
+    print(f"Results from outside the library: {s['leaks']}   (must be 0)")
+    if s["misses"]:
+        print("Missed: " + ", ".join(s["misses"]))
+    return EXIT_PARTIAL if s["leaks"] else EXIT_OK
+
+
+def cmd_eval_check(args) -> int:
+    items, library = _golden_and_library(args)
+    problems = core.eval_check_golden(items, library)
+    for problem in problems:
+        print(f"[{problem.kind}] {problem.item_id}: {problem.message}")
+    counts = golden.split_counts(items)
+    print(f"\n{len(items)} questions. By type: {counts['type']}. By split: {counts['split']}.")
+    errors = sum(1 for p in problems if p.kind == "error")
+    print(f"{errors} error(s), {len(problems) - errors} warning(s).")
+    return EXIT_ERROR if errors else (EXIT_PARTIAL if problems else EXIT_OK)
+
+
+def cmd_eval_show(args) -> int:
+    items, library = _golden_and_library(args)
+    found = [i for i in items if i.id == args.item_id]
+    if not found:
+        _err(f"No question with the id '{args.item_id}'.")
+        return EXIT_ERROR
+    print(core.eval_show_item(found[0], library))
+    return EXIT_OK
+
+
+def cmd_eval_kappa(args) -> int:
+    labels_a = (
+        agreement.read_labels(args.labels_a) if args.labels_a
+        else agreement.labels_from_golden(golden.load_golden(args.golden))
+    )
+    report = agreement.compare(labels_a, agreement.read_labels(args.labels_b))
+    print(agreement.format_report(report))
+    return EXIT_OK if report.meets_gate else EXIT_PARTIAL
+
+
+def cmd_eval_sheet(args) -> int:
+    chosen = agreement.sample_for_second_labeller(golden.load_golden(args.golden), args.count)
+    agreement.write_labelling_sheet(args.out, chosen)
+    print(f"Wrote {args.out} with {len(chosen)} questions (no gold answers).")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="podcast-recall",
@@ -632,6 +733,39 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
                    help=f"search the seed file's episodes instead of your library (default file: {DEFAULT_SEED})")
     p.add_argument("--explain", action="store_true", help="show the scores behind each result")
+
+    evaluation = sub.add_parser("eval", help="Run the evaluation: golden set, rubric checks, kappa.")
+    esub = evaluation.add_subparsers(dest="command", required=True)
+
+    def eadd(name: str, func, help_text: str, files: bool = True) -> argparse.ArgumentParser:
+        sp = esub.add_parser(name, help=help_text, description=help_text)
+        sp.set_defaults(func=func)
+        sp.add_argument("--golden", default=GOLDEN_PATH, help=f"the golden set (default {GOLDEN_PATH})")
+        if files:
+            sp.add_argument("--library", default=LIBRARY_PATH,
+                            help=f"the evaluation library (default {LIBRARY_PATH})")
+        return sp
+
+    p = eadd("run", cmd_eval_run, "Grade answers with the deterministic rubric checks (R1, R2, R5, R7).")
+    source = p.add_mutually_exclusive_group(required=True)
+    source.add_argument("--answers", metavar="FILE", help="answers as JSON Lines, one per question id")
+    source.add_argument("--oracle", action="store_true", help="grade perfect answers built from the golden set (must score 100%%)")
+    source.add_argument("--fabricate", metavar="MODE", choices=oracle.FABRICATE_MODES,
+                        help="grade deliberately wrong answers; modes: " + ", ".join(oracle.FABRICATE_MODES))
+    p.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
+    p.add_argument("--out", metavar="FILE", help="write the per-question scorecard CSV here")
+    p = eadd("retrieval", cmd_eval_retrieval, "Measure recall@5 on the golden questions.")
+    p.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
+    p.add_argument("--no-vectors", action="store_true", help="keyword search only")
+    eadd("check", cmd_eval_check, "Check the golden set itself: evidence exists, absent answers are absent.")
+    p = eadd("show", cmd_eval_show, "Show one question with the transcript text at its gold time.")
+    p.add_argument("item_id")
+    p = eadd("kappa", cmd_eval_kappa, "Compare two labellers' sheets (Cohen's kappa on question type).", files=False)
+    p.add_argument("--labels-b", required=True, metavar="FILE", help="the second labeller's sheet")
+    p.add_argument("--labels-a", metavar="FILE", help="the first labeller's sheet (default: the golden set)")
+    p = eadd("sheet", cmd_eval_sheet, "Write the sheet the second labeller fills in (questions only).", files=False)
+    p.add_argument("--out", default=SHEET_PATH, help=f"where to write it (default {SHEET_PATH})")
+    p.add_argument("--count", type=int, default=20, help="how many questions (default 20)")
     return parser
 
 

@@ -97,6 +97,25 @@ episodes in your own library (or, with `--seed`, exactly the seed file's episode
 Ollama running, `index build` stops with a clear message and `search` falls back to keywords.
 `--explain` shows the scores, including the meaning distance (0 is identical; larger is further away).
 
+### Evaluation (Week 2)
+
+```
+uv run podcast-recall eval check                       # golden set: evidence exists, absent answers are absent
+uv run podcast-recall eval show q01                    # one question with the transcript text at its gold time
+uv run podcast-recall eval run --oracle                # perfect answers built from the golden set: must score 100%
+uv run podcast-recall eval run --fabricate invented_quote   # deliberately wrong answers: must fail
+uv run podcast-recall eval run --answers answers.jsonl --out evals/scorecards/run.csv
+uv run podcast-recall eval retrieval                   # recall@5 on the golden questions
+uv run podcast-recall eval sheet                       # the sheet for the second labeller (questions only)
+uv run podcast-recall eval kappa --labels-b filled.csv # agreement with the second labeller
+```
+
+The golden set is `data/golden/golden_v0.csv` and the evaluation library `data/golden/eval_library.csv`
+(change them with `--golden` and `--library`). Answers are JSON Lines, one per question id, in the format
+in `podcast_recall/answers.py`. `eval run` checks the deterministic rubric rules only (R1 the quote is real,
+R2 the source is in the library, R5 abstention, R7 timestamp). The model-judged rules (R3, R4, R6) come later,
+and the scorecard says so. Exit code 2 means some answers failed.
+
 ## Tests
 
 ```bash

@@ -12,8 +12,11 @@ from contextlib import contextmanager, nullcontext
 
 from podcast_recall import (
     auth,
+    evalrun,
+    golden_check,
     indexer,
     jobs,
+    oracle,
     paths,
     podcastindex,
     resolve,
@@ -562,3 +565,61 @@ def search_episodes(
 def get_chunk(chunk_id: int, *, conn=None):
     with _Db(conn) as db:
         return retrieval.get_chunk(db, chunk_id)
+
+
+# ---------------------------------------------------------------------------- evaluation (Week 2)
+
+
+def run_eval(
+    items,
+    library_video_ids,
+    *,
+    answers: dict | None = None,
+    use_oracle: bool = False,
+    fabricate: str | None = None,
+    split: str = "all",
+    conn=None,
+):
+    """Grade answers with the deterministic rubric checks. The answers come from a file (already
+    read), from the oracle (perfect answers built from the golden set), or from a fabricator."""
+    with _Db(conn) as db:
+        ctx = evalrun.build_context(db, library_video_ids)
+        if answers is None:
+            answers = oracle.answers_for(items, ctx, oracle=use_oracle, mode=fabricate)
+        return evalrun.grade_all(items, answers, ctx, split)
+
+
+def eval_retrieval(
+    items,
+    library_video_ids,
+    *,
+    split: str = "all",
+    services: indexer.IndexServices | None = None,
+    conn=None,
+):
+    """Recall@5 and friends on the golden questions, searching the evaluation library."""
+    chosen = [i for i in items if split == "all" or i.split == split]
+    services = services or indexer.IndexServices()
+    with _Db(conn) as db:
+        ctx = evalrun.build_context(db, library_video_ids)
+        embedder = services.get_embedder()
+
+        def search(question: str):
+            return retrieval.find(
+                db, embedder, question, OWNER, video_ids=library_video_ids, limit=10,
+                use_vectors=services.use_vectors,
+            ).hits
+
+        return evalrun.retrieval_outcomes(chosen, ctx, search)
+
+
+def eval_check_golden(items, library_video_ids, *, conn=None):
+    with _Db(conn) as db:
+        ctx = evalrun.build_context(db, library_video_ids)
+        return golden_check.check_all(db, items, ctx)
+
+
+def eval_show_item(item, library_video_ids, *, conn=None) -> str:
+    with _Db(conn) as db:
+        ctx = evalrun.build_context(db, library_video_ids)
+        return golden_check.show_item(item, ctx)

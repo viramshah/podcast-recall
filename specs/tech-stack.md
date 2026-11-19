@@ -13,7 +13,7 @@ Change an entry only by editing this file and recording why in `decisions.md`.
 | Storage and search | SQLite, FTS5 (porter stemming), `sqlite-vec` (cosine), reciprocal rank fusion | $0 | One file, no server. About 1,000 chunks for the 16 seed episodes |
 | Core library | Plain Python package: `sync_library`, `fetch_videos`, `list_channels`, `set_podcast_channel`, `revoke`, `purge_stale_videos`, `build_index`, `index_status`, `search_episodes`, `get_chunk`, `ask`, `get_transcript`, `save_finding`, `export_findings` | $0 | One implementation shared by the web chat, CLI and eval harness (D7) |
 | Web chat | FastAPI + uvicorn, one static HTML page, bound to `127.0.0.1` | $0 | Replaces the MCP client; testers need a browser only |
-| CLI | `podcast-recall` command (`auth`, `sync`, `status`, `revoke`, `channels`, `fetch`, `purge`, `resolve`, `transcribe`, `ask`, `index`, `search`) | $0 | Development and eval use |
+| CLI | `podcast-recall` command (`auth`, `sync`, `status`, `revoke`, `channels`, `fetch`, `purge`, `resolve`, `transcribe`, `ask`, `index`, `search`, `eval`) | $0 | Development and eval use |
 | Platform data | YouTube Data API v3 (read-only, free quota), Podcast Index API (free key) | $0 | |
 | Auth storage | macOS Keychain via `keyring` | $0 | Tokens never in files |
 | Export | Markdown, Google Docs API, Apple Notes (AppleScript), Notion API | $0 | Notion is the first cut if time runs short |
