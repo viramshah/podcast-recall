@@ -1,6 +1,6 @@
 # Week 2: Evaluation First, Requirements (v2, 2026-11-18)
 
-Branch: `feature/week2-eval` (from `main` after U4 was merged). Source: requirements doc sections 1.3 (metrics), 1.4 (rubric) and U8 (eval harness), and `specs/plan.md` Week 2. Decisions: D5 (rubric thresholds), D6 (second labeller), D11 (languages), D17 (retrieval). v2 adds the PM's answers to the 24 pre-build questions (all recommendations accepted), listed at the end and recorded as D18. D6 (the second labeller's name) is still open.
+Branch: `feature/week2-eval` (from `main` after U4 was merged). Source: requirements doc sections 1.3 (metrics), 1.4 (rubric) and U8 (eval harness), and `specs/plan.md` Week 2. Decisions: D5 (rubric thresholds), D6 (second labeller), D11 (languages), D17 (retrieval). v2 adds the PM's answers to the 24 pre-build questions (all recommendations accepted), listed at the end and recorded as D18. D6 is decided: Jainam second-labels 20 items.
 
 ## Why eval comes first
 The product promise is "every answer is grounded and cited". The gate is: at least 90% of golden-set answers pass the rubric, at most 2% contain a critical failure, and no fabricated citation reaches the user. None of that can be claimed, or improved, without a yardstick we trust. U4 showed the cost of skipping this: 10 questions said 90%, 20 said 70%, and two problems were in the measuring, not the product. Week 2 builds the yardstick before the answering code (U6) exists.
@@ -47,7 +47,7 @@ The checkers need a structured answer. U6 will produce exactly this (proposed, Q
   "claims": [
     { "text": "...",
       "citations": [ { "video_id": "...", "episode_id": 123, "show": "...", "title": "...",
-                       "quote": "(at most 2 sentences)", "start_s": 1541.0,
+                       "quote": "(at most 2 sentences and 60 words)", "start_s": 1541.0,
                        "url": "https://youtu.be/<id>?t=1531" } ] }
   ],
   "summary": "optional one-paragraph answer text"
@@ -96,13 +96,13 @@ Golden set and labels live in `data/golden/` (CSV, committed: private repo, shor
 - **R1 checks the stored transcript, not the audio.** A Whisper error is invisible to it. Mitigation: spot-check by ear, tracked separately.
 - **Small set.** 60 items, with 20 held out, is thin. Mitigation: report counts with every percentage and grow to 120 in Week 4.
 - **Questions can become stale or ambiguous** as the library grows. Mitigation: ids are stable, and changes are logged.
-- **No second labeller yet** (D6 is open). The kappa gate cannot be met without one. The fallback (the PM re-labels after a week) is weaker, because the same person labels twice, and would be recorded as such.
+- **The second labeller needs a way to find the answers.** Each item sits in a 60 to 140 minute episode. Without a searchable transcript, finding 20 answers could take several hours, not one. Transcripts are not shared (non-functional requirements), so the labeller uses the episodes themselves (YouTube's own transcript panel is searchable) and the PM decides what else to allow.
 
 ## Decisions made in the pre-build review (2026-11-18, all recommendations accepted)
 1. Week 2 covers: rubric, golden set v0, deterministic checkers, kappa script, harness skeleton, retrieval recall on the golden set. The judge and the release gate come in Weeks 3 and 4.
 2. The corpus is the 16 seed episodes.
 3. The assistant drafts 60 candidate questions from the transcripts; the PM reviews each (about 3 hours).
-4. D6: a named colleague or friend second-labels 20 items. **No name yet (open).** If no one is found, the PM re-labels the 20 items after a week, recorded as a weaker intra-rater check.
+4. D6: **Jainam** second-labels 20 items (decided 2026-11-18).
 5. Kappa is computed on the question type. Episode and time agreement are reported as percentages.
 6. If kappa is below 0.7: rewrite the ambiguous items and label again.
 7. R1 similarity: lowercase, strip punctuation, find the best-matching run of words of the quote's length inside the cited window, and require at least 0.90 word similarity (difflib ratio).
@@ -130,4 +130,5 @@ Golden set and labels live in `data/golden/` (CSV, committed: private repo, shor
 - R2 also checks that a citation's video belongs to its episode.
 - For not-in-library and unanswerable questions the expected status is `not_found`, and the claims list must be empty.
 - A missing answer for a golden item counts as a failure (Major, "no answer").
+- **A quote is at most 2 sentences and at most 60 words** (found on 2026-11-18: some publisher transcripts have no punctuation, so "2 sentences" alone cannot limit a quote; the oracle's own quote ran to 2,390 words until this was fixed). U6 must respect both limits.
 - Until the judge exists, the scorecard says clearly that it covers the deterministic rules only (R1, R2, R5, R7) and not R3, R4 or R6.

@@ -1,6 +1,6 @@
 # Week 2: Evaluation First, Results (in progress)
 
-Recorded 2026-11-18. Spec: `validation.md` (v2). Automated: 431 tests pass, lint clean.
+Recorded 2026-11-18. Spec: `validation.md` (v2). Automated: 433 tests pass, lint clean.
 
 ## Built
 Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabricator (six modes), scorecard, kappa, golden-set checks, and the `eval` commands (`run`, `retrieval`, `check`, `show`, `kappa`, `sheet`).
@@ -17,7 +17,7 @@ Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabrica
 | 1 | Read the rubric and apply it by hand | Pending: the rubric is in the requirements; a standalone `rubric.md` with worked examples is still to write |
 | 2 | Review the 60 drafted questions and write at least 20 of your own | Pending (PM) |
 | 3 | `eval check` | Pending: needs the PM's database |
-| 4 | Second labeller labels 20 items | Pending: D6 has no name yet |
+| 4 | Second labeller labels 20 items | Pending: Jainam (D6 decided 2026-11-18). Sheet and instructions written |
 | 5 | `eval kappa` at least 0.7 | Pending |
 | 6 | `eval run --oracle` scores 100% on the real golden set | Pending: needs the PM's database |
 | 7 | `eval run --fabricate ...` fails as expected | Pending |
@@ -25,3 +25,7 @@ Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabrica
 | 9 | Compare with the 75% probe result | Pending |
 | 10 | Held-out items are kept separate | Pending |
 | 11 | Git and secrets check | Pending |
+
+## Findings so far
+- **`eval check` on the real database: clean.** 60 questions, 0 errors, 0 warnings.
+- **The first oracle run scored 92%, not 100%.** Five R1 failures, all caused by the oracle itself: it built quotes by adding segments until it had two sentences, and the AI Agents Full Course transcript has no punctuation, so it ran on for up to 2,390 words (14 minutes). Two more quotes ran slightly past the 15 second window. Fixed: the oracle stays inside the window and under 60 words, and the answer format now caps a quote at 60 words as well as 2 sentences. A regression test uses a transcript without punctuation. The fabricator run behaved correctly (28% accuracy, 72% critical, only the unanswerable-type questions pass).

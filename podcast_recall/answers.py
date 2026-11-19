@@ -6,7 +6,7 @@
                                      "quote", "start_s", "url" } ] } ],
       "summary": "optional" }
 
-Answers are read from JSON. Anything structurally wrong raises `AnswerFormatError`, and the
+Answers are read from JSON. A quote is at most 2 sentences and 60 words. Anything structurally wrong raises `AnswerFormatError`, and the
 harness counts that answer as failed with the reason `format`.
 """
 
@@ -21,6 +21,7 @@ from podcast_recall.errors import ConfigError, PodcastRecallError
 
 STATUSES = ("answered", "not_found", "premise_corrected")
 MAX_QUOTE_SENTENCES = 2
+MAX_QUOTE_WORDS = 60  # sentence counting means nothing on transcripts without punctuation
 LINK_LEAD_S = 10  # links open this many seconds before the quote
 
 
@@ -79,6 +80,8 @@ def parse_citation(data: object, where: str) -> Citation:
     quote = _text(data, "quote", where)
     if sentence_count(quote) > MAX_QUOTE_SENTENCES:
         raise AnswerFormatError(f"{where}: a quote may be at most {MAX_QUOTE_SENTENCES} sentences.")
+    if len(quote.split()) > MAX_QUOTE_WORDS:
+        raise AnswerFormatError(f"{where}: a quote may be at most {MAX_QUOTE_WORDS} words.")
     return Citation(
         video_id=_text(data, "video_id", where),
         episode_id=episode_id,

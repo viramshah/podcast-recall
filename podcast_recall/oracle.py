@@ -10,6 +10,7 @@ from __future__ import annotations
 from podcast_recall import golden
 from podcast_recall.answers import (
     MAX_QUOTE_SENTENCES,
+    MAX_QUOTE_WORDS,
     Answer,
     Citation,
     Claim,
@@ -17,7 +18,7 @@ from podcast_recall.answers import (
     link_for,
     sentence_count,
 )
-from podcast_recall.checkers import EvalContext, expected_status
+from podcast_recall.checkers import WINDOW_S, EvalContext, expected_status
 from podcast_recall.errors import ConfigError
 from podcast_recall.golden import GoldenItem
 
@@ -41,7 +42,9 @@ def _trim_to_sentences(text: str, limit: int = MAX_QUOTE_SENTENCES) -> str:
 
 
 def real_quote(ctx: EvalContext, episode_id: int, at_s: float) -> tuple[str, float]:
-    """A real quote of at most 2 sentences from the segment at `at_s`, and that segment's start."""
+    """A real quote from the segment at `at_s`: at most 2 sentences and 60 words, and only from
+    segments that start inside the checker's window, so the quote is always findable there. (A
+    transcript without punctuation has no sentence ends, so the word limit is what stops it.)"""
     transcript = ctx.transcript_for(episode_id)
     if transcript is None or not transcript.segments:
         raise ConfigError(f"No transcript for episode {episode_id}.")
@@ -51,10 +54,16 @@ def real_quote(ctx: EvalContext, episode_id: int, at_s: float) -> tuple[str, flo
         chosen = min(segments, key=lambda s: abs(s.start - at_s))
     index = segments.index(chosen)
     text = chosen.text
-    while sentence_count(text) < MAX_QUOTE_SENTENCES and index + 1 < len(segments):
+    while (
+        sentence_count(text) < MAX_QUOTE_SENTENCES
+        and len(text.split()) < MAX_QUOTE_WORDS
+        and index + 1 < len(segments)
+        and segments[index + 1].start <= chosen.start + WINDOW_S - 1
+    ):
         index += 1
         text = f"{text} {segments[index].text}"
-    return _trim_to_sentences(text), chosen.start
+    words = _trim_to_sentences(text).split()
+    return " ".join(words[:MAX_QUOTE_WORDS]), chosen.start
 
 
 def _citation(ctx: EvalContext, video_id: str, episode_id: int, quote: str, start_s: float) -> Citation:

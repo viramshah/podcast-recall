@@ -156,6 +156,15 @@ class AnswerFormat(Base):
         with self.assertRaises(AnswerFormatError):
             answers.parse_answer([1, 2])
 
+    def test_a_quote_may_be_at_most_sixty_words_even_without_any_punctuation(self):
+        data = self.good()
+        data["claims"][0]["citations"][0]["quote"] = " ".join(["word"] * 61)
+        with self.assertRaises(AnswerFormatError) as caught:
+            answers.parse_answer(data)
+        self.assertIn("60 words", str(caught.exception))
+        data["claims"][0]["citations"][0]["quote"] = " ".join(["word"] * 60)
+        self.assertEqual(len(answers.parse_answer(data).claims), 1)
+
     def test_a_quote_may_be_at_most_two_sentences(self):
         data = self.good()
         data["claims"][0]["citations"][0]["quote"] = "One. Two. Three."
@@ -562,6 +571,20 @@ class Harness(EvalBase):
         # 14 of 15 words match: similarity 0.93, above 0.90
         cited = citation(quote="Today we talk about the kubernetes deployment pipeline for our crew.", start_s=0.0)
         self.assertIsNone(checkers.check_r1(cited, self.ctx))
+
+    def test_the_oracle_stays_short_on_a_transcript_with_no_punctuation(self):
+        """Regression: publisher transcripts can have no sentence ends, and the oracle once built a quote
+        of thousands of words from the rest of the episode."""
+        run_on = [f"and then we talked about topic number {i} for a while and kept going without stopping" for i in range(80)]
+        self.world.add_episode(307, 1, "No punctuation", "2026-10-02T10:00:00", run_on)
+        ctx = evalrun.build_context(self.conn, [*self.library, vid(307)])
+        quote, start = oracle.real_quote(ctx, 307, 200.0)
+        self.assertLessEqual(len(quote.split()), answers.MAX_QUOTE_WORDS)
+        self.assertEqual(start, 200.0)
+        self.assertIsNone(checkers.check_r1(citation(episode_id=307, quote=quote, start_s=start, video_id=vid(307)), ctx))
+        gold = item("long", golden.SINGLE_FACT, "What was said?", [Evidence(vid(307), 200.0)])
+        grade = evalrun.grade_all([gold], oracle.answers_for([gold], ctx, oracle=True), ctx)[0]
+        self.assertTrue(grade.passed, [f.reason for f in grade.failures])
 
     def test_the_oracle_quote_is_real_and_at_most_two_sentences(self):
         for evidence in (Evidence(vid(301), 5.0), Evidence(vid(304), 0.0), Evidence(vid(305), 6.0)):
