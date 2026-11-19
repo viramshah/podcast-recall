@@ -29,6 +29,8 @@ Settings come only from environment variables.
 | `PODCAST_RECALL_WHISPER_FALLBACK_MODEL` | `mlx-community/whisper-large-v3-turbo` | Larger model tried once when a Whisper run takes too long (half the audio length plus 5 minutes, at least 10) or its transcript is flagged. `none` turns the retry off. |
 | `PODCAST_RECALL_EMBED_MODEL` | `nomic-embed-text` | Ollama model used to turn transcript chunks and questions into vectors for meaning search. Pull it once with `ollama pull nomic-embed-text`. |
 | `PODCAST_RECALL_OLLAMA_URL` | `http://127.0.0.1:11434` | Where Ollama listens. Only a loopback address is accepted. |
+| `PODCAST_RECALL_CHUNK_SECONDS` | `120` | Target length of a search chunk (15 to 300). Changing it makes the next `index build` redo every episode. Used for tuning. |
+| `PODCAST_RECALL_CHUNK_OVERLAP_SECONDS` | 20% of the chunk length (`24`) | How far each chunk reaches back into the one before (0 to half the chunk length). |
 
 ## Commands
 

@@ -16,12 +16,32 @@ Recorded 2026-11-18 against the PM's real seed transcripts and local Ollama (`no
 | 6 | Exact phrase, then paraphrase | Passed | PM confirmed |
 | 7 | Symbols in the query | Passed | PM confirmed |
 | 8 | Show, date and ambiguous-show filters | Passed | PM confirmed |
-| 9 | Ollama stopped | Pending | |
-| 10 | Ctrl+C during a build | Pending | |
-| 11 | Probe set recall@5 | Pending | Needs the PM's 10 questions and a check of the 10 drafted answer times |
+| 9 | Ollama stopped | Passed | PM confirmed: clear message and exit code 1 on `index build`; `search` falls back to keywords with a warning |
+| 10 | Ctrl+C during a build | Passed | PM confirmed: a later build finished the rest, no duplicates |
+| 11 | Probe set recall@5 | **Below target, tuning in progress** | See "Probe set results" below |
 | 12 | A query that matches nothing | Passed | PM confirmed: weak results, no crash |
-| 13 | No transcript or query text in logs | Pending | |
-| 14 | Git and secrets check | Pending | |
+| 13 | No transcript or query text in logs | Passed | PM confirmed |
+| 14 | Git and secrets check | Passed | PM confirmed |
+
+## Probe set results (20 questions: 10 `claude` confirmed by the PM, 10 `claude2` drafted from other passages; 6 are Raj Shamani)
+| Setting | Recall@5 | MRR |
+|---|---|---|
+| First 10 questions, keyword + meaning, cap 3 | 90% (after the scoring fix) | 0.59 |
+| First 10, keyword only | 70% | 0.57 |
+| First 10, cap 5 or 10 | 80% | 0.59 |
+| **All 20, keyword + meaning, cap 3, equal weight** | **70%** (target 85%) | 0.51 |
+| All 20, meaning weight 1.5 / 2 / 3 / 5 | 65% / 60% / 60% / 65% | 0.48 to 0.50 |
+| Raj Shamani only (6 questions) | 67% | |
+
+- The first 10 questions were too few: 90% did not hold up on 20.
+- **A scoring flaw was found and fixed:** answer times were rounded down to a whole second, so a chunk starting a fraction after that second was wrongly counted as a miss. Scoring now allows 2 seconds of slack. It had understated recall.
+- **An early explanation was wrong:** the per-episode cap was suspected for the first miss. Raising it did not help and hurt another question, so 3 stays.
+- **A heavier meaning weight does not help.** Equal weight stays.
+- **Chunk length experiment (20 questions, on a copy of the data, equal weight, cap 3):** 30 s / 8 s overlap gives 35% (3,184 chunks, MRR 0.31); 45 s / 10 s gives 55% (1,988 chunks, MRR 0.42); 75 s / 15 s gives 70% (1,156 chunks, MRR 0.51), and reproduces the real index exactly, which confirms the method. Smaller chunks are clearly worse: short snippets carry too little context for the meaning embedding, and the questions are about ideas. Larger sizes are next.
+- **Larger chunks, same 20 questions (on a copy):** recall@5 / MRR / Raj only: 100 s 70% / 0.56 / 83%; 110 s 75% / 0.52 / 83%; 120 s 75% / 0.60 / 83%; **125 s 85% / 0.76 / 83%**; 130 s 75% / 0.58 / 83%; 140 s 75% / 0.62 / 83%; 150 s 70% / 0.58 / 83%. The 125 s result is a lucky outlier: its neighbours all score 75%. The real finding is a plateau from about 100 to 150 s that is modestly better than 75 s (recall 70 to 75% against 70%, MRR about 0.56 to 0.62 against 0.51, Raj Shamani 83% against 67%). **No chunk size reaches 85%.**
+- **Decision:** the default is now 120 s with 24 s overlap (the middle of the plateau). It halves the chunk count (724 against 1,156). Tuned on 20 questions, so provisional until the Week 2 golden set. The reranker is the remaining lever, planned for the Week 4 hill-climb ("tune chunking, reranking, prompts").
+- **The six misses (20 questions):** the right chunk ranks 12th, 10th, 26th, 36th and 41st for five of them, and is not in the top 50 for one. One (salt and blood pressure) is a near miss: the returned chunks are the neighbours of the right one in the same conversation. The seed library is almost all about AI agents, so queries that mention agents face many near-duplicates.
+- **Next levers:** smaller chunks (chunk length and overlap are now settings), then a reranker over the top 50 (the spec allows it once recall falls short; it needs its own decision).
 
 ## Findings
 - **Scope worked as designed and exposed a tooling gap.** A normal search covers only the user's library (rubric R2). The seed episodes were matched from the seed file, not from the library, so most were invisible. Added `search --seed` (and the probe script uses the seed list by default). Same `matched`-only rule and filters apply.
@@ -30,6 +50,6 @@ Recorded 2026-11-18 against the PM's real seed transcripts and local Ollama (`no
 - **Two chunks can tie** on the fused score (one found by keyword first, one by meaning first). Ties go to keyword order.
 
 ## Open items
-- Steps 9, 10, 13 and 14, and the probe set (step 11).
+- The probe set (step 11): the PM's 10 questions and the recall@5 run.
 - Raj Shamani retrieval quality (D11, D17) is judged by probe questions 1 to 3.
 - Write `docs/Week1d_U4_Explained.md` when U4 is closed.

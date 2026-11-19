@@ -21,10 +21,10 @@ Branch: `feature/u4-index-retrieval` (from `main` after U3 was merged). Depends 
 
 ### Chunking
 1. Read the transcript's segments in time order. Only transcripts with status `ok` are indexed (`needs_review` ones are skipped until accepted).
-2. Fill a chunk with whole segments until it holds about **75 seconds** (a segment is never cut). Start the next chunk about **15 seconds** before the previous one ended, so a sentence on a boundary appears in both.
+2. Fill a chunk with whole segments until it holds about **120 seconds** (a segment is never cut; the length is a setting). Start the next chunk about **24 seconds** before the previous one ended, so a sentence on a boundary appears in both.
 3. Each chunk stores: chunk ID, episode ID, chunk number, `start_s` (first segment start), `end_s` (last segment end), the text, the word count, the speaker label **only if one label covers more than half of the chunk's words** (otherwise none), the chunking version, and a hash of the source transcript.
 4. Chunking is a pure function: same transcript and settings, same chunks. Segments are first sorted by start time and used as they are (overlaps are kept). Speaker labels are never part of the text that is indexed or embedded.
-5. A constant `CHUNKING_VERSION` identifies the rules (size 75 s, overlap 15 s, boundaries). Changing any of them means changing the version, which makes the next build re-index every episode.
+5. The stored chunking version combines the rules version (`CHUNKING_VERSION`) with the chunk length and overlap, so changing the rules or either setting makes the next build re-index every episode.
 
 ### Index (hybrid search)
 - **Keyword:** SQLite FTS5 over the chunk text (BM25 ranking).
@@ -89,7 +89,7 @@ Branch: `feature/u4-index-retrieval` (from `main` after U3 was merged). Depends 
 ## Known risks
 - **Embeddings are English-focused.** The four Raj Shamani transcripts are English with Hindi words in Latin letters. Meaning search may be weaker there. The keyword half still works. The probe set includes 2 to 3 questions from those episodes as evidence for D11, and a multilingual embedding model is revisited if they retrieve badly.
 - **No reranker yet.** Ollama does not serve rerankers, and the options (a PyTorch model of about 2 GB, or the answer model as a slow reranker) are not worth their cost until the probe set shows a recall gap.
-- **Chunk size is a guess.** 75 seconds with a 15 second overlap is the requirements doc's range. Week 4 will tune it, so chunking is versioned and re-runnable.
+- **Chunk size was tuned on 20 questions.** The first guess of 75 s was changed to 120 s with a 24 s overlap after an experiment (see `results.md`): short chunks scored far worse, 100 to 150 s formed a plateau, and one apparent peak at 125 s was luck. Week 4 will re-tune on the golden set, so chunking is versioned and re-runnable. A chunk this long means a link opens up to about two minutes before the answer, so U6 must cite the exact sentence's time inside the chunk, not the chunk's start.
 - **YouTube and podcast audio can differ.** Intros, ads or cuts could shift times. On the seed list lengths matched to within 1 second, so links should open at the right place. A per-episode offset correction is a v2 item.
 - **Retrieval is judged on a small probe set until Week 2.** The 85% target is only meaningful on the real golden set.
 
@@ -101,7 +101,7 @@ Branch: `feature/u4-index-retrieval` (from `main` after U3 was merged). Depends 
 2. Probe set: the PM writes 10 questions from episodes they know, the assistant drafts 10 from the transcripts, and the PM verifies the answer times.
 3. The probe set includes 2 to 3 questions from the Raj Shamani episodes.
 4. U4 is done when retrieval works and recall@5 is measured on the probe set against 85%. One tuning round is allowed if below.
-5. Chunks are 75 seconds with 15 seconds of overlap.
+5. Chunks were 75 seconds with 15 seconds of overlap (changed to 120 s and 24 s on 2026-11-18, see Known risks).
 6. Whole segments only.
 7. Speaker label stored only when one label covers more than half the chunk, and never embedded.
 8. Segments are sorted by start time and overlaps are kept.

@@ -94,4 +94,6 @@ Status values: Open, Decided. Fill in "Decision" and "Date" as you go in Week 0.
 
 ### D17: U4 retrieval
 - Open checks: does `nomic-embed-text` retrieve the four Raj Shamani episodes as well as the others (D11)? Does recall@5 reach 85% on the probe set without a reranker? _TBD after U4 validation_
+- Chunk size (2026-11-18): tested 30 to 150 s on a copy. Short chunks are much worse (30 s: 35%, 45 s: 55%); 100 to 150 s is a plateau of 70 to 75% recall with MRR 0.52 to 0.62; one 85% result at 125 s was a lucky outlier. Default changed from 75 s / 15 s to **120 s / 24 s**. Still below the 85% target: reranker deferred to the Week 4 hill-climb.
+- Probe result (2026-11-18, 20 questions): recall@5 is 70% against the 85% target with keyword plus meaning search, cap 3 and equal weight. Keyword only is lower, and a heavier meaning weight does not help. Reranker decision: _open_, pending the chunk-size experiment. Details in `features/u4-index-retrieval/results.md`.
 - Early evidence (2026-11-18): on the seed episodes, relevant chunks had a meaning distance of about 0.30 to 0.33 and loosely related ones about 0.39 to 0.41. Starting guess for U6's abstention threshold: 0.35, to be tuned on the Week 2 golden set.

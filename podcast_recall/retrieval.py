@@ -19,6 +19,7 @@ from podcast_recall.models import SearchHit, SearchResult
 CANDIDATES = 30  # taken from each method before they are combined
 MAX_CANDIDATES = 480  # the most taken when the per-episode cap leaves too few results
 RRF_CONSTANT = 60
+SEMANTIC_WEIGHT = 1.0  # how much the meaning ranking counts against the keyword ranking
 DEFAULT_LIMIT = 8
 MAX_LIMIT = 50
 DEFAULT_PER_EPISODE = 3
@@ -163,12 +164,15 @@ def vector_search(
     return [(r[0], r[1]) for r in rows]
 
 
-def fuse(keyword: Sequence[int], semantic: Sequence[int]) -> list[tuple[int, float]]:
-    """Reciprocal rank fusion: each list adds 1 / (60 + rank). Best first, ties by keyword rank."""
+def fuse(
+    keyword: Sequence[int], semantic: Sequence[int], semantic_weight: float = SEMANTIC_WEIGHT
+) -> list[tuple[int, float]]:
+    """Reciprocal rank fusion: each list adds weight / (60 + rank). Best first, ties by keyword
+    rank. The keyword list has weight 1 and the meaning list `semantic_weight`."""
     scores: dict[int, float] = {}
-    for ranking in (keyword, semantic):
+    for ranking, weight in ((keyword, 1.0), (semantic, semantic_weight)):
         for rank, chunk_id in enumerate(ranking, 1):
-            scores[chunk_id] = scores.get(chunk_id, 0.0) + 1.0 / (RRF_CONSTANT + rank)
+            scores[chunk_id] = scores.get(chunk_id, 0.0) + weight / (RRF_CONSTANT + rank)
     position = {c: i for i, c in enumerate(keyword)}
     return sorted(scores.items(), key=lambda kv: (-kv[1], position.get(kv[0], 10**9), kv[0]))
 
@@ -263,12 +267,16 @@ def find(
     limit: int = DEFAULT_LIMIT,
     per_episode: int = DEFAULT_PER_EPISODE,
     use_vectors: bool = True,
+    semantic_weight: float | None = None,
 ) -> SearchResult:
     """Search the user's library, or, with `video_ids`, exactly those videos' episodes instead."""
     if not 1 <= limit <= MAX_LIMIT:
         raise ConfigError(f"limit must be between 1 and {MAX_LIMIT}.")
     if per_episode < 1:
         raise ConfigError("per_episode must be at least 1.")
+    weight = SEMANTIC_WEIGHT if semantic_weight is None else semantic_weight
+    if weight < 0:
+        raise ConfigError("semantic_weight cannot be negative.")
     phrases, words = parse_query(query)
     expression = fts_expression(phrases, words)
     if expression is None:
@@ -298,7 +306,7 @@ def find(
         keyword = keyword_search(conn, expression, k)
         semantic = vector_search(conn, query_vector, k) if query_vector is not None else []
         hits = _build_hits(
-            conn, fuse(keyword, [c for c, _ in semantic]), keyword, semantic,
+            conn, fuse(keyword, [c for c, _ in semantic], weight), keyword, semantic,
             user_id=user_id, video_ids=video_ids, limit=limit, per_episode=per_episode,
         )
         exhausted = len(keyword) < k and (query_vector is None or len(semantic) < k)

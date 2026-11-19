@@ -78,7 +78,7 @@ def episodes_to_index(
         stale = rebuild or state is None or not path.is_file()
         if not stale:
             stale = (
-                state["chunking_version"] != chunker.CHUNKING_VERSION
+                state["chunking_version"] != chunker.current_version()
                 or state["transcript_hash"] != file_hash(path)
                 or (vectors_ok and (not state["embedded"] or state["embed_model"] != embed_model))
             )
@@ -145,7 +145,7 @@ def index_episode(
             "chunking_version = excluded.chunking_version, embed_model = excluded.embed_model, "
             "embedded = excluded.embedded, chunk_count = excluded.chunk_count, "
             "indexed_at = excluded.indexed_at",
-            (episode_id, digest, chunker.CHUNKING_VERSION,
+            (episode_id, digest, chunker.current_version(),
              embedder.model if vecs is not None and embedder else None,
              int(vecs is not None), len(drafts), now),
         )
@@ -204,7 +204,7 @@ def index_status(
         chunks=sum(s["chunk_count"] for s in states),
         waiting=len(work),
         without_vectors=sum(1 for s in states if not s["embedded"]),
-        chunking_version=chunker.CHUNKING_VERSION,
+        chunking_version=chunker.current_version(),
         embed_model=embed_model,
         vectors_available=vectors_available,
         vector_rows=vectors.row_count(conn) if vectors_available else 0,

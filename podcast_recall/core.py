@@ -542,6 +542,7 @@ def search_episodes(
     video_ids=None,
     limit: int = retrieval.DEFAULT_LIMIT,
     per_episode: int = retrieval.DEFAULT_PER_EPISODE,
+    semantic_weight: float | None = None,
     services: indexer.IndexServices | None = None,
     conn=None,
 ):
@@ -554,7 +555,7 @@ def search_episodes(
         return retrieval.find(
             db, services.get_embedder(), query, user_id, show=show, since=since, until=until,
             episode_ids=episode_ids, video_ids=video_ids, limit=limit, per_episode=per_episode,
-            use_vectors=services.use_vectors,
+            use_vectors=services.use_vectors, semantic_weight=semantic_weight,
         )
 
 

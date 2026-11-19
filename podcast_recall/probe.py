@@ -2,7 +2,7 @@
 
 Each probe row is a question, the YouTube video it is answered in, and `gold_s`, a second inside
 the answer. A search result counts as correct when it is a chunk of that episode whose time range
-contains `gold_s`. Recall@5 is the share of questions with a correct chunk in the top 5.
+contains `gold_s` (give or take `GOLD_TOLERANCE_S`). Recall@5 is the share of questions with a correct chunk in the top 5.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from podcast_recall.errors import ConfigError
 from podcast_recall.models import SearchHit
 
 REQUIRED = ("question", "video_id", "gold_s")
+GOLD_TOLERANCE_S = 2.0  # answer times are only known to about a second, so allow a little slack
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,8 @@ class ProbeOutcome:
     row: ProbeRow
     rank: int | None  # 1-based position of the first correct chunk, or None
     top: list[SearchHit]
+    deep_rank: int | None = None  # for a miss: its rank in a deep search without the episode cap
+    gold_distance: float | None = None
 
 
 def load_probe(path: str | Path) -> list[ProbeRow]:
@@ -59,9 +62,16 @@ def load_probe(path: str | Path) -> list[ProbeRow]:
     return rows
 
 
+def holds_gold(hit: SearchHit, episode_id: int, gold_s: float) -> bool:
+    return (
+        hit.episode_id == episode_id
+        and hit.start_s - GOLD_TOLERANCE_S <= gold_s <= hit.end_s + GOLD_TOLERANCE_S
+    )
+
+
 def gold_rank(hits: Sequence[SearchHit], episode_id: int, gold_s: float) -> int | None:
     for position, hit in enumerate(hits, 1):
-        if hit.episode_id == episode_id and hit.start_s <= gold_s <= hit.end_s:
+        if holds_gold(hit, episode_id, gold_s):
             return position
     return None
 

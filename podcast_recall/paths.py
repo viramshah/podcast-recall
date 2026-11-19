@@ -17,6 +17,9 @@ DEFAULT_REFRESH_DAYS = 30
 DEFAULT_WHISPER_MODEL = "mlx-community/whisper-small-mlx"
 DEFAULT_FALLBACK_MODEL = "mlx-community/whisper-large-v3-turbo"
 DEFAULT_EMBED_MODEL = "nomic-embed-text"
+DEFAULT_CHUNK_SECONDS = 120.0  # D17: the middle of the 100 to 150 s plateau found on 2026-11-18
+DEFAULT_CHUNK_OVERLAP_SECONDS = 24.0  # for the default length; scales with a changed length
+OVERLAP_FRACTION = 0.2
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 
 
@@ -68,6 +71,35 @@ def raw_transcripts_dir() -> Path:
 
 def transcribe_lock_path() -> Path:
     return data_home() / "transcribe.lock"
+
+
+def _number_setting(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        raise ConfigError(f"{name} must be a number of seconds, not '{raw}'.") from None
+
+
+def chunk_seconds() -> float:
+    """Target length of a search chunk in seconds (setting `PODCAST_RECALL_CHUNK_SECONDS`)."""
+    value = _number_setting("PODCAST_RECALL_CHUNK_SECONDS", DEFAULT_CHUNK_SECONDS)
+    if not 15 <= value <= 300:
+        raise ConfigError("PODCAST_RECALL_CHUNK_SECONDS must be between 15 and 300.")
+    return value
+
+
+def chunk_overlap_seconds() -> float:
+    """How far each chunk reaches back into the previous one (`PODCAST_RECALL_CHUNK_OVERLAP_SECONDS`).
+    When not set it is 20% of the chunk length (24 s for the default 120 s)."""
+    value = _number_setting(
+        "PODCAST_RECALL_CHUNK_OVERLAP_SECONDS", round(chunk_seconds() * OVERLAP_FRACTION)
+    )
+    if not 0 <= value <= chunk_seconds() / 2:
+        raise ConfigError("PODCAST_RECALL_CHUNK_OVERLAP_SECONDS must be between 0 and half the chunk length.")
+    return value
 
 
 def index_lock_path() -> Path:

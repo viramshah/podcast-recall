@@ -467,7 +467,10 @@ def cmd_index_status(args) -> int:
     print(f"Episodes indexed: {s.episodes_indexed}, chunks: {s.chunks}")
     print(f"Waiting to be indexed: {s.waiting}")
     print(f"Episodes without meaning vectors: {s.without_vectors}")
-    print(f"Chunking version: {s.chunking_version}, embedding model: {s.embed_model}")
+    print(
+        f"Chunks: about {paths.chunk_seconds():g} s with {paths.chunk_overlap_seconds():g} s overlap "
+        f"(version {s.chunking_version}), embedding model: {s.embed_model}"
+    )
     print(f"Vector search available: {'yes' if s.vectors_available else 'no'} ({s.vector_rows} vectors)")
     return EXIT_PARTIAL if (s.waiting or s.without_vectors) else EXIT_OK
 

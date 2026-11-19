@@ -176,7 +176,7 @@ class Chunking(Base):
     def segments(self, count=60, step=5.0):
         return [seg(i * step, i * step + step - 0.2, f"segment {i} has some words") for i in range(count)]
 
-    def test_chunks_are_about_75_seconds_overlap_by_about_15_and_cover_everything(self):
+    def test_chunks_are_about_120_seconds_overlap_by_about_24_and_cover_everything(self):
         chunks = chunker.chunk_segments(self.segments())
         self.assertEqual([c.chunk_no for c in chunks], list(range(len(chunks))))
         for c in chunks[:-1]:
@@ -196,10 +196,10 @@ class Chunking(Base):
         self.assertEqual(chunker.chunk_segments(self.segments()), chunker.chunk_segments(self.segments()))
 
     def test_a_segment_is_never_cut(self):
-        long = [seg(0, 100, "one very long segment spoken without a break"), seg(100, 104, "short")]
+        long = [seg(0, 200, "one very long segment spoken without a break"), seg(200, 204, "short")]
         chunks = chunker.chunk_segments(long)
         self.assertEqual(chunks[0].text, "one very long segment spoken without a break")
-        self.assertEqual((chunks[0].start_s, chunks[0].end_s), (0, 100))
+        self.assertEqual((chunks[0].start_s, chunks[0].end_s), (0, 200))
         self.assertIn("short", chunks[-1].text)
 
     def test_empty_and_blank_input(self):
@@ -222,6 +222,47 @@ class Chunking(Base):
     def test_speaker_labels_are_not_part_of_the_text(self):
         chunks = chunker.chunk_segments([seg(0, 5, "hello there", "SPEAKER_00")])
         self.assertNotIn("SPEAKER", chunks[0].text)
+
+    def test_the_chunk_length_and_overlap_follow_the_settings(self):
+        import os
+
+        for name in ("PODCAST_RECALL_CHUNK_SECONDS", "PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"):
+            self.addCleanup(os.environ.pop, name, None)
+        os.environ["PODCAST_RECALL_CHUNK_SECONDS"] = "30"
+        os.environ["PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"] = "8"
+        chunks = chunker.chunk_segments(self.segments())
+        self.assertGreater(len(chunks), 8)  # about 300 s in chunks of about 30 s
+        for chunk in chunks[:-1]:
+            self.assertLessEqual(chunk.end_s - chunk.start_s, 30.0)
+        for a, b in itertools.pairwise(chunks):
+            self.assertGreaterEqual(a.end_s - b.start_s, 3)
+            self.assertLessEqual(a.end_s - b.start_s, 13)
+
+    def test_the_version_changes_when_the_length_or_overlap_change(self):
+        import os
+
+        for name in ("PODCAST_RECALL_CHUNK_SECONDS", "PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"):
+            self.addCleanup(os.environ.pop, name, None)
+        default = chunker.current_version()
+        self.assertEqual(default, 1_120_024)
+        os.environ["PODCAST_RECALL_CHUNK_SECONDS"] = "45"
+        self.assertEqual(chunker.current_version(), 1_045_009)  # the overlap follows: 20% of 45 s
+        os.environ["PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"] = "10"
+        self.assertEqual(chunker.current_version(), 1_045_010)
+
+    def test_bad_chunk_settings_are_clear_errors(self):
+        import os
+
+        for name in ("PODCAST_RECALL_CHUNK_SECONDS", "PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"):
+            self.addCleanup(os.environ.pop, name, None)
+        for seconds, overlap in (("abc", None), ("5", None), ("900", None), ("60", "40"), ("60", "-1")):
+            os.environ["PODCAST_RECALL_CHUNK_SECONDS"] = seconds
+            if overlap is None:
+                os.environ.pop("PODCAST_RECALL_CHUNK_OVERLAP_SECONDS", None)
+            else:
+                os.environ["PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"] = overlap
+            with self.assertRaises(ConfigError, msg=(seconds, overlap)):
+                chunker.chunk_segments(self.segments())
 
     def test_word_count(self):
         self.assertEqual(chunker.chunk_segments([seg(0, 5, "one two three")])[0].word_count, 3)
@@ -375,6 +416,21 @@ class Indexing(IndexBase):
         self.assertFalse(any("kubernetes" in h.text for h in self.find("kubernetes").hits))
         self.assertEqual(self.find("telescopes").hits[0].episode_id, 101)
         self.assertEqual(self.vector_count(), self.chunk_count())
+
+    def test_changing_the_chunk_length_redoes_every_episode_and_changes_the_chunks(self):
+        import os
+
+        self.world.add_episode(120, 1, "A long one", "2026-10-01T10:00:00", filler(60))  # 300 s
+        self.build()
+        before = self.chunk_count()
+        self.addCleanup(os.environ.pop, "PODCAST_RECALL_CHUNK_SECONDS", None)
+        self.addCleanup(os.environ.pop, "PODCAST_RECALL_CHUNK_OVERLAP_SECONDS", None)
+        os.environ["PODCAST_RECALL_CHUNK_SECONDS"] = "15"
+        os.environ["PODCAST_RECALL_CHUNK_OVERLAP_SECONDS"] = "3"
+        self.assertEqual(self.build().indexed, 1)
+        self.assertGreater(self.chunk_count(), before * 2)
+        self.assertEqual(self.vector_count(), self.chunk_count())
+        self.assertEqual(self.build().indexed, 0)
 
     def test_a_new_chunking_version_redoes_every_episode(self):
         self.three_episodes()
@@ -660,6 +716,18 @@ class Searching(IndexBase):
         scores = dict(fused)
         self.assertAlmostEqual(scores[1], 1 / 61 + 1 / 63)
 
+    def test_a_heavier_meaning_weight_can_outrank_a_keyword_favourite(self):
+        keyword, semantic = [10, 11, 12], [12, 10, 11]
+        self.assertEqual(next(c for c, _ in retrieval.fuse(keyword, semantic)), 10)
+        self.assertEqual(next(c for c, _ in retrieval.fuse(keyword, semantic, 3.0)), 12)
+        self.assertEqual([c for c, _ in retrieval.fuse(keyword, semantic, 0.0)], [10, 11, 12])
+
+    def test_the_weight_reaches_the_search_and_is_validated(self):
+        self.assertEqual(retrieval.SEMANTIC_WEIGHT, 1.0)
+        self.find("morning", semantic_weight=2.5)
+        with self.assertRaises(ConfigError):
+            self.find("morning", semantic_weight=-1)
+
     def test_fusion_ties_go_to_the_keyword_order(self):
         fused = retrieval.fuse([5, 6], [6, 5])
         self.assertEqual([c for c, _ in fused], [5, 6])
@@ -795,6 +863,16 @@ class ProbeScoring(IndexBase):
         self.assertIsNone(probe.gold_rank(hits, 5, 500))
         self.assertIsNone(probe.gold_rank(hits, 8, 130))
 
+    def test_a_little_slack_is_allowed_because_answer_times_are_rounded(self):
+        from podcast_recall import probe
+
+        chunk = [self.hit(5, 1392.48, 1467.0)]  # starts a fraction after the rounded time 1392
+        self.assertEqual(probe.gold_rank(chunk, 5, 1392), 1)
+        self.assertEqual(probe.gold_rank(chunk, 5, 1390.6), 1)
+        self.assertIsNone(probe.gold_rank(chunk, 5, 1380))
+        self.assertEqual(probe.gold_rank(chunk, 5, 1468.5), 1)
+        self.assertIsNone(probe.gold_rank(chunk, 5, 1480))
+
     def test_recall_and_mrr(self):
         from podcast_recall import probe
 
@@ -909,7 +987,7 @@ class Starvation(IndexBase):
     """One long episode must not fill the candidate lists and leave the others out."""
 
     def test_the_per_episode_cap_does_not_starve_the_result_list(self):
-        quokkas = [f"Quokkas are small and quokkas are friendly, fact {i}." for i in range(700)]
+        quokkas = [f"Quokkas are small and quokkas are friendly, fact {i}." for i in range(1500)]
         self.world.add_episode(401, 1, "All about quokkas", "2026-10-01T10:00:00", quokkas)
         self.world.add_episode(402, 2, "A short mention", "2026-10-02T10:00:00",
                                ["Someone once mentioned quokkas briefly.", "Then we moved on."])
