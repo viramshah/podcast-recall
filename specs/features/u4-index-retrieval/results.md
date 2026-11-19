@@ -18,7 +18,7 @@ Recorded 2026-11-18 against the PM's real seed transcripts and local Ollama (`no
 | 8 | Show, date and ambiguous-show filters | Passed | PM confirmed |
 | 9 | Ollama stopped | Passed | PM confirmed: clear message and exit code 1 on `index build`; `search` falls back to keywords with a warning |
 | 10 | Ctrl+C during a build | Passed | PM confirmed: a later build finished the rest, no duplicates |
-| 11 | Probe set recall@5 | **Below target, tuning in progress** | See "Probe set results" below |
+| 11 | Probe set recall@5 | **Measured: 75%, below the 85% target** | After the tuning round (default now 120 s / 24 s). Confirmed on the real index: 724 chunks, recall@5 75%, MRR 0.60, Raj Shamani 83% on 6 questions. See "Probe set results" below |
 | 12 | A query that matches nothing | Passed | PM confirmed: weak results, no crash |
 | 13 | No transcript or query text in logs | Passed | PM confirmed |
 | 14 | Git and secrets check | Passed | PM confirmed |
@@ -49,7 +49,12 @@ Recorded 2026-11-18 against the PM's real seed transcripts and local Ollama (`no
 - **Meaning distance separates relevant from loose matches on this data:** about 0.30 to 0.33 for the relevant chunks, about 0.39 to 0.41 for loosely related ones. A starting guess of 0.35 for U6's "I don't know" threshold; to be tuned on the Week 2 golden set.
 - **Two chunks can tie** on the fused score (one found by keyword first, one by meaning first). Ties go to keyword order.
 
+## Exit gate
+U4's gate (decision D17, question 4) is that retrieval works and recall@5 is **measured** on the probe set, with one tuning round allowed if below 85%. Measured: **75% at the tuned default**, from 70% before tuning. The 85% target is **not met**. The remaining lever is a reranker, deferred to the Week 4 hill-climb, where the 120-question golden set can judge it. All 14 manual steps and the automated checks passed.
+
 ## Open items
-- The probe set (step 11): the PM's 10 questions and the recall@5 run.
+- Week 2 and 4: re-measure recall@5 on the real golden set, and decide the reranker.
+- Check the 10 `claude2` answer times (questions 11 to 20), especially the three Raj Shamani ones (11, 17, 18), by opening the links. A wrong time would make that question a false miss.
+- U6: cite the exact sentence's time inside a chunk, not the chunk's start (chunks are now 120 s).
 - Raj Shamani retrieval quality (D11, D17) is judged by probe questions 1 to 3.
-- Write `docs/Week1d_U4_Explained.md` when U4 is closed.
+- `docs/Week1d_U4_Explained.md` written.
