@@ -657,6 +657,19 @@ class GoldenChecks(EvalBase):
         absent = self.problems([item("b", golden.FALSE_PREMISE, "Why did the guest say bread is poison?")])
         self.assertEqual(absent, [])
 
+    def test_the_items_own_search_phrases_are_used_when_given(self):
+        indexer.build_index(self.conn, indexer.IndexServices(embedder=FakeEmbedder()), now=self.now)
+        # the speaker's name is not in any transcript, so searching the question's words finds nothing...
+        plain = item("a", golden.UNANSWERABLE, "What does Snyder say about the sourdough starter feeding?")
+        self.assertEqual(self.problems([plain]), [])
+        # ...but the concept phrases the writer chose do find the sourdough episode
+        phrased = GoldenItem("b", golden.UNANSWERABLE, plain.question, "", ("sourdough starter", "feeding"), (), "pm",
+                             "dev", (), "")
+        found = self.problems([phrased])
+        self.assertEqual(len(found), 1)
+        self.assertIn("'sourdough starter', 'feeding'", found[0].message)
+        self.assertEqual(golden_check.search_phrases(phrased), ["sourdough starter", "feeding"])
+
     def test_key_terms_are_the_longest_non_stop_words(self):
         self.assertEqual(golden_check.key_terms("Why did the guest recommend intermittent fasting?"),
                          ["intermittent", "recommend", "fasting", "guest"])

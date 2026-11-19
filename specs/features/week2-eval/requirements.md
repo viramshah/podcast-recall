@@ -115,7 +115,7 @@ Golden set and labels live in `data/golden/` (CSV, committed: private repo, shor
 14. The golden set is one CSV in `data/golden/`, with the evidence as `video@mm:ss`.
 15. Fields: id, type, question, gold_answer, key_points, gold_evidence, author, split, tags, notes.
 16. The v0 mix of 60: 20 single-fact, 13 synthesis, 10 who/when, 7 unanswerable, 5 false premise, 5 not-in-library.
-17. About 11 episodes form the evaluation library; 5 are held back as "indexed but not in the library". The PM chooses the 5.
+17. 11 episodes form the evaluation library (`data/golden/eval_library.csv`); 5 are held back as "indexed but not in the library" (`data/golden/held_out_episodes.csv`). The assistant proposed the split and the PM can veto it. Rule used: a held-out episode's topic must be distinct from every library episode, so a "not in the library" question cannot be answered legitimately from the library. Held out: Diet Expert (Raj Shamani), Inside the black box of AI, Meta's Muse, Why PMs are suddenly valuable again (all Lenny's), and The 9 Stages of AI Agent Adoption (Greg Isenberg). Library: Gita Gopinath, Sachin Puri and Vinh Giang (Raj Shamani, 3 of the 11); Josh Woodward, Jen Abel and Rob Snyder (Lenny's); and five Greg Isenberg episodes.
 18. A script checks that each gold time exists in its transcript and that unanswerable and false-premise items are absent from the transcripts.
 19. Natural wording that differs from the speaker's; at least a third written by the PM from memory; the Raj Shamani episodes included in proportion and tagged `raj` (D11).
 20. 20 of the 60 are held out and never used for tuning.

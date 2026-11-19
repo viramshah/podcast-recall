@@ -32,8 +32,16 @@ def key_terms(question: str) -> list[str]:
     return sorted(unique, key=lambda w: (-len(w), w))[:MAX_TERMS]
 
 
+def search_phrases(item: GoldenItem) -> list[str]:
+    """What to look for to prove an answer is absent: the item's own `key_points` (concept phrases
+    chosen by whoever wrote the question) when given, otherwise the question's most distinctive words."""
+    if item.key_points:
+        return [" ".join(normalize(p)) for p in item.key_points if normalize(p)]
+    return key_terms(item.question)
+
+
 def presence_hits(conn: sqlite3.Connection, terms: Sequence[str], limit: int = 3) -> list[tuple[int, float, str]]:
-    """Chunks anywhere in the index that contain ALL the terms: (episode id, start, snippet)."""
+    """Chunks anywhere in the index that contain ALL the terms or phrases: (episode id, start, snippet)."""
     if not terms:
         return []
     expression = " AND ".join(f'"{t}"' for t in terms)
@@ -76,12 +84,12 @@ def check_item(conn: sqlite3.Connection, item: GoldenItem, ctx: EvalContext) -> 
                 add("error", f"the transcript has no words within {WINDOW_S:g} s of "
                              f"{golden.format_time(evidence.start_s)} in {evidence.video_id}")
     elif item.type in (golden.UNANSWERABLE, golden.FALSE_PREMISE):
-        terms = key_terms(item.question)
+        terms = search_phrases(item)
         if not terms:
             add("warning", "the question has no distinctive words to check for")
         for episode_id, start, snippet in presence_hits(conn, terms):
             add("warning",
-                f"all of {', '.join(terms)} appear together in episode {episode_id} at "
+                f"all of {', '.join(repr(t) for t in terms)} appear together in episode {episode_id} at "
                 f"{golden.format_time(start)}: \"{snippet}\" (is the answer really absent?)")
     return problems
 
