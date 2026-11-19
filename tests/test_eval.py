@@ -662,6 +662,19 @@ class GoldenChecks(EvalBase):
         outside = self.problems([item("b", golden.SINGLE_FACT, evidence=[Evidence(vid(306), 5.0)])])
         self.assertIn("not in the evaluation library", outside[0].message)
 
+    def test_evidence_in_the_first_three_minutes_of_a_long_episode_is_flagged_as_a_possible_teaser(self):
+        self.world.add_episode(308, 1, "A long one", "2026-10-03T10:00:00", [f"Sentence number {i} is here." for i in range(80)])
+        ctx = evalrun.build_context(self.conn, [*self.library, vid(308)])  # 400 seconds long
+        early = golden_check.check_item(self.conn, item("a", golden.SINGLE_FACT, evidence=[Evidence(vid(308), 5.0)]), ctx)
+        self.assertEqual([p.kind for p in early], ["warning"])
+        self.assertIn("cold-open teaser", early[0].message)
+        later = golden_check.check_item(self.conn, item("b", golden.SINGLE_FACT, evidence=[Evidence(vid(308), 300.0)]), ctx)
+        self.assertEqual(later, [])
+
+    def test_a_short_episode_is_not_flagged_for_early_evidence(self):
+        short = self.problems([item("a", golden.SINGLE_FACT, evidence=[Evidence(vid(301), 5.0)])])  # a 15 second episode
+        self.assertEqual(short, [])
+
     def test_evidence_time_must_be_inside_the_transcript(self):
         found = self.problems([item("a", golden.SINGLE_FACT, evidence=[Evidence(vid(301), 5000.0)])])
         self.assertIn("no words within", found[0].message)

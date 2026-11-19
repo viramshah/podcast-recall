@@ -1,6 +1,6 @@
 # Week 2: Evaluation First, Results (in progress)
 
-Recorded 2026-11-18. Spec: `validation.md` (v2). Automated: 433 tests pass, lint clean.
+Recorded 2026-11-18. Spec: `validation.md` (v2). Automated: 435 tests pass, lint clean.
 
 ## Built
 Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabricator (six modes), scorecard, kappa, golden-set checks, and the `eval` commands (`run`, `retrieval`, `check`, `show`, `kappa`, `sheet`).
@@ -29,3 +29,13 @@ Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabrica
 ## Findings so far
 - **`eval check` on the real database: clean.** 60 questions, 0 errors, 0 warnings.
 - **The first oracle run scored 92%, not 100%.** Five R1 failures, all caused by the oracle itself: it built quotes by adding segments until it had two sentences, and the AI Agents Full Course transcript has no punctuation, so it ran on for up to 2,390 words (14 minutes). Two more quotes ran slightly past the 15 second window. Fixed: the oracle stays inside the window and under 60 words, and the answer format now caps a quote at 60 words as well as 2 sentences. A regression test uses a transcript without punctuation. The fabricator run behaved correctly (28% accuracy, 72% critical, only the unanswerable-type questions pass).
+
+## Dry run of the second-labeller step (NOT the D6 gate)
+On 2026-11-18 the PM asked the assistant to play the second labeller. That cannot satisfy D6: the assistant wrote the questions and the gold answers, so agreement mostly measures its memory of its own work. It was done only to test the path from sheet to kappa, saved separately as `data/golden/labelling_sheet_claude_dryrun.csv`, and the real labeller (Jainam) still has to label the real sheet.
+- **Result:** kappa 1.00 on type, same episodes 100%, times within 15 s 88%. Meaningless as an agreement measure for the reason above. The pipeline works (sheet in, `eval kappa` out, exit code 0).
+- **Useful findings from the exercise** (questions a cold reader finds unclear):
+  - `sf01`, `sf03`, `sf09`, `sf15`, `ww07` say "the guest" or "the presenter" without naming an episode, and `sf06` says "he". They are findable by search but vague. Consider naming the show or the topic.
+  - `sf06` ("When does he say you should write down a story...") reads like a who/when question; it asks for the circumstances. Consider rewording ("In what situations should you...").
+  - `fp01` and `fp03` could be labelled `unanswerable` as well as `false_premise`, because the premise is simply absent. The type definitions should say that a question that asserts a statement the speaker never made is a false premise.
+  - `nl01` and `nl03` differ by 24 s and 50 s on the time: one picks where the answer begins, the other where it concludes. Gold times should mean "where the answer begins".
+- **A real defect it exposed:** the gold evidence for `sy10` (Jen Abel) pointed at 0:09, the cold-open teaser, instead of her answer at 9:19. The same trap had caught `sf07` earlier. Fixed in `golden_v0.csv`. `eval check` now warns when evidence is in the first three minutes of an episode longer than six minutes. Audited every other evidence time: none are that early, and the repeated anchor phrases left (`sy04`) are inside one continuous discussion.

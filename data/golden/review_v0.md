@@ -253,8 +253,8 @@ Split: **dev** items may be used for tuning later; **heldout** items are only fo
 - Key points: markets, customers, channels; 10 to 20 partners; head of legal, VPs, directors
 - Evidence: [Billion-Dollar Tech CEO: How To Make AI Work Like 100 Employ at 1:06:36](https://youtu.be/8ol3j7o1U7o?t=3996)
   > what are the top markets in which this product has been used? Who are the customers who are using this? Okay. What are the different channels through which they are getting access to these services? Give me the names of, build me a full profile of 10, 20 people, companies in each of those markets
-- Evidence: [How to close $100K+ enterprise deals, step by step | Jen Abe at 0:09](https://youtu.be/YS9In813jJ0?t=9)
-  > Let's set this up. Let's start with how do I even get the first meeting? We're in this flood the zone moment of everyone trying to break into the enterprise. But like, what exactly are you solving for them as a problem that's level one, but most importantly, the alpha? And it needs to be
+- Evidence: [How to close $100K+ enterprise deals, step by step | Jen Abe at 9:19](https://youtu.be/YS9In813jJ0?t=559)
+  > It's a great question. So I think let's start with like, how do I even get the first meeting? How do I even engage with these people? There is so many, there's so much nuance as you target, as you know, as we're using the case study of SpaceX today. You have the top of
 
 ### sy11: How do the guests get AI agents to produce work that matches a particular look?
 - Split: dev  |  Author: claude

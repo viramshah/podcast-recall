@@ -1,0 +1,21 @@
+id,question,type,gold_evidence,comment
+fp01,Why does Jen Abel say you should never offer a free trial?,false_premise,,"Searched 'free trial' and 'never offer': nothing in any episode. The question assumes Jen said it, so I read it as a false premise, but it could also be called unanswerable."
+fp03,Why does Rob Snyder say sales calls are a waste of time?,false_premise,,Searched 'waste of time' near 'sales calls': Rob never says it. Same ambiguity as fp01: false premise or unanswerable.
+nl01,What did the nutrition expert say about salt and blood pressure?,not_in_library,xi-zHJL5bnI@19:05,
+nl03,Why did the Meta team keep the Jolly avatar instead of a corporate logo?,not_in_library,WY0cdD4gNoQ@26:09,
+sf01,"What can push inflation away from a central bank's target, according to the guest?",single_fact,dNIef2fGLQY@10:30,'the guest' does not say which episode; I found it by searching.
+sf03,Which questions does the guest suggest putting to an AI assistant to find channel partners for a product?,single_fact,8ol3j7o1U7o@1:06:45,'the guest' does not say which episode.
+sf06,When does he say you should write down a story you might tell later?,single_fact,BgeNDG5jD60@1:11:39,'When does he say...' is unclear: it could be read as a who/when question (a time in the episode) or as 'under what circumstances'. I read it as the circumstances. Also 'he' does not say who.
+sf09,How often does the guest tell a prospect that the gap between them is simply too big?,single_fact,YS9In813jJ0@25:50,'the guest' does not say which episode.
+sf12,What does Rob Snyder mean by a hair-on-fire problem?,single_fact,19qrLchbQEc@8:43,
+sf15,How is a skill different from keeping something in an agent's memory?,single_fact,eA9Zf2-qYYM@41:25,"Could be argued as a comparison of two things, but both parts are in one place."
+sf18,What did the guest's bot do when he bought a PS5 Pro?,single_fact,1cWZ7Ekff6E@43:26,
+sy01,"What do the guests say about working closely with early customers, even by hand, before trying to scale?",synthesis,19qrLchbQEc@59:53; 67BmkptgTms@44:08,
+sy04,How do the guests say AI is changing marketing and creative work?,synthesis,uJuxenfe-NU@5:18; st61aKW8P5A@33:35,
+sy07,What do the guests say about how and when to charge customers?,synthesis,YS9In813jJ0@59:37; 67BmkptgTms@15:14,
+sy10,How do the guests suggest deciding who to approach first when selling or distributing a product?,synthesis,8ol3j7o1U7o@1:06:36; YS9In813jJ0@0:09,Jen's part is a question and the start of her answer; the full answer is about who the buyers are.
+un01,How does Jen Abel say to design a pricing page for enterprise plans?,unanswerable,,Searched 'pricing page' and 'enterprise plans': nothing.
+un04,What does Sachin Puri say about taking his company public on the stock market?,unanswerable,,"Searched 'go public' and 'IPO': Sachin says nothing. Jen mentions someone's IPO in passing, unrelated."
+ww01,When does Rob Snyder describe getting the prospect's approval of the call agenda?,who_when,19qrLchbQEc@43:08,
+ww04,"Who brings up the idea of a dedicated frontier team, and at what point?",who_when,3I6QYkccd3o@43:44,The host brings it up; I read 'who' as the speaker.
+ww07,When does the presenter explain that an agent's memory works differently from a chat model's?,who_when,eA9Zf2-qYYM@18:07,'the presenter' does not say which episode.

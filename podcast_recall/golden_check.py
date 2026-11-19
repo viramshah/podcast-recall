@@ -16,6 +16,7 @@ from podcast_recall.checkers import WINDOW_S, EvalContext, normalize
 from podcast_recall.golden import GoldenItem
 
 MAX_TERMS = 4  # key terms used to look for an answer that should not exist
+TEASER_S = 180  # evidence this early in a long episode is often a cold-open teaser, not the real answer
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,11 @@ def check_item(conn: sqlite3.Connection, item: GoldenItem, ctx: EvalContext) -> 
                 add("error", f"{evidence.video_id} is in the library, so it cannot be a not-in-library question")
             if item.type != golden.NOT_IN_LIBRARY and not in_library:
                 add("error", f"{evidence.video_id} is not in the evaluation library")
+            transcript = ctx.transcript_for(episode_id)
+            long_episode = transcript is not None and max((x.end for x in transcript.segments), default=0) > 2 * TEASER_S
+            if long_episode and evidence.start_s < TEASER_S:
+                add("warning", f"the evidence at {golden.format_time(evidence.start_s)} in {evidence.video_id} is in the first "
+                               f"{TEASER_S // 60} minutes: check it is the real answer and not a cold-open teaser that repeats a line from later")
             if not normalize(text_near(ctx, episode_id, evidence.start_s)):
                 add("error", f"the transcript has no words within {WINDOW_S:g} s of "
                              f"{golden.format_time(evidence.start_s)} in {evidence.video_id}")
