@@ -14,13 +14,13 @@ Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabrica
 ## Not yet done
 | # | Step | Status |
 |---|---|---|
-| 1 | Read the rubric and apply it by hand | Pending: the rubric is in the requirements; a standalone `rubric.md` with worked examples is still to write |
+| 1 | Read the rubric and apply it by hand | Rubric v1.0 written (`rubric.md`, with worked examples). PM to read it and confirm they would grade the same way |
 | 2 | Review the 60 drafted questions and write at least 20 of your own | Pending (PM) |
-| 3 | `eval check` | Pending: needs the PM's database |
+| 3 | `eval check` | **Passed**: 60 questions, 0 errors, 0 warnings |
 | 4 | Second labeller labels 20 items | Pending: Jainam (D6 decided 2026-11-18). Sheet and instructions written |
 | 5 | `eval kappa` at least 0.7 | Pending |
-| 6 | `eval run --oracle` scores 100% on the real golden set | Pending: needs the PM's database |
-| 7 | `eval run --fabricate ...` fails as expected | Pending |
+| 6 | `eval run --oracle` scores 100% on the real golden set | **Passed** (after the oracle fix): 60/60 = 100%, 0 critical, R7 30/30 |
+| 7 | `eval run --fabricate ...` fails as expected | Partly: `invented_quote` run by the PM scored 17/60 = 28%, 43 critical (every answerable question fails, the 17 unanswerable-type ones pass). The other five modes are covered by automated tests; the PM can run them |
 | 8 | `eval retrieval` baseline | Pending |
 | 9 | Compare with the 75% probe result | Pending |
 | 10 | Held-out items are kept separate | Pending |
