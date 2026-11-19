@@ -3,7 +3,7 @@
 Thank you for doing this. You will label 20 questions about 16 podcast episodes, **without seeing the answers**. Your labels are compared with Viram's to check that the questions are clear enough for two people to read the same way. Disagreements are useful: they show which questions are ambiguous.
 
 ## What you have
-- `labelling_sheet.csv`: 20 questions. Columns: `id`, `question`, `type`, `gold_evidence`, `comment`. Fill in `type` and `gold_evidence`, and use `comment` for anything confusing.
+- `labelling_sheet.csv`: 20 questions. Columns: `id`, `question`, `type`, `gold_evidence`, `comment`. Fill in `type` (**what kind of question it is**, explained below) and `gold_evidence` (where the answer is), and use `comment` for anything confusing.
 - The 16 episodes below. Eleven are **in the library** and five are **outside it** (the app was told to treat those five as not saved).
 
 **Please do not** look at `golden_v0.csv`, `review_v0.md` or any gold answers, and do not ask Viram about a question while you are labelling. If a question is confusing, write that in `comment`. A confusing question is a finding.
@@ -30,23 +30,47 @@ Thank you for doing this. You will label 20 questions about 16 podcast episodes,
 - Greg Isenberg: [The 9 Stages of AI Agent Adoption, Explained](https://www.youtube.com/watch?v=nRl-7Yhmbog)
 
 ## What to fill in for each question
-### 1. `type`: choose exactly one of these six
-| type | Use it when |
-|---|---|
-| `single_fact` | The answer is one fact, stated in one place, in **one library episode** |
-| `who_when` | The question asks **who said** something or **when** it was said, and one library episode answers it |
-| `synthesis` | A good answer needs **two or more library episodes** (for example "what do different guests say about...") |
-| `unanswerable` | The question is on topic, but **no episode answers it** (none of the 16) |
-| `false_premise` | The question assumes something a speaker **never said** (for example "Why did X say Y?" when X did not say Y) |
-| `not_in_library` | The answer exists, but **only in one of the five outside episodes** |
+
+You fill in two columns: first the **kind** of question (the column is called `type`), then **where the answer is** (`gold_evidence`).
+
+### 1. `type`: what kind of question is this?
+
+"Type" does **not** mean how hard the question is, or what topic it is about. It means: **what would a correct answer look like, and where would you find it?** There are six kinds. Find the answer first (search the 16 episodes below), then choose the kind.
+
+**How to decide: ask these in order and stop at the first "yes".**
+
+1. Is the answer found **only** in one of the 5 **outside** episodes, and in none of the 11 library episodes? Then it is **`not_in_library`**.
+2. Does the question **assume something that nobody actually said**? For example "Why did X recommend Y?" when X never mentioned Y. Then it is **`false_premise`**.
+3. Is the answer **missing from all 16 episodes**, even though the topic is related, and the question does not assume anything false? Then it is **`unanswerable`**.
+4. The answer is in the library. Does a good answer need **two or more library episodes**? Then it is **`synthesis`**.
+5. Does the question ask **who** said something, or **at what point in the episode** something is said? Then it is **`who_when`**.
+6. Otherwise: one fact, stated in one library episode. It is **`single_fact`**.
+
+| type | In plain words | A correct answer looks like |
+|---|---|---|
+| `single_fact` | One fact, stated in one place | The fact itself |
+| `who_when` | Asks who said it, or when in the episode | A speaker and/or a moment |
+| `synthesis` | Needs several episodes put together | A comparison or summary across episodes |
+| `unanswerable` | Related to the episodes, but they do not say it | "That is not in your library" |
+| `false_premise` | Takes for granted something nobody said | A correction: "that was not said" |
+| `not_in_library` | The answer exists, but only in an outside episode | "That is not in your library" |
+
+**Invented examples** (these are not from your sheet): "How many ingredients does the host say the sauce needs?" is `single_fact`. "Who first suggests moving the launch to spring, and when?" is `who_when`. "How do the different chefs describe resting dough?" is `synthesis`. "What oven temperature does the host recommend for pies?" is `unanswerable` if pies are never discussed. "Why did the guest say butter is bad for you?" is `false_premise` if the guest never said it. A question whose answer is only in one of the five outside episodes is `not_in_library`.
+
+**When two kinds seem to fit:**
+- If the answer is in a library episode **and** in an outside one, it can be answered from the library, so use 4, 5 or 6 above, not `not_in_library`.
+- A question that **assumes** something nobody said is `false_premise`, even though the answer is also "not there". `unanswerable` is for questions that do not assume anything false.
+- A "when" question that asks about **circumstances** ("when should you...") and not about a **moment in the episode** is not `who_when`. `who_when` is about a point in the episode, or who was speaking.
+- If you are still unsure, pick the closer kind and explain in `comment`. That is useful information.
 
 ### 2. `gold_evidence`: where the answer is
-Write `video_id@mm:ss` using the 11-character ID from the episode link (the part after `v=`) and the time where the answer **starts**. Examples: `abcdefghijk@12:30` or `abcdefghijk@1:02:03`.
+
+Write `video_id@mm:ss`: the 11-character ID from the episode link (the part after `v=`), then the time where the answer **starts**. That means where the speaker **begins** giving the answer, not where they finish. For "who said it" questions, use the moment that person starts saying it. Examples: `abcdefghijk@12:30` or `abcdefghijk@1:02:03`.
 - `single_fact`, `who_when`, `not_in_library`: **one** piece of evidence.
 - `synthesis`: **two or more**, separated by a semicolon: `abcdefghijk@12:30; bcdefghijkl@45:10`.
 - `unanswerable` and `false_premise`: leave it **blank**.
 
-Being within about 15 seconds of the true time is good enough.
+Being within about 15 seconds of the true time is good enough. Beware of the **intro teaser**: many episodes open with a short preview of lines from later. If you find a line in the first few minutes, check whether it is repeated later in a real discussion, and use the later one.
 
 ## How long this takes
 **Plan for 2 to 4 hours**, not one. Each answer sits somewhere in a 30 to 140 minute episode, and you have to find it, or confirm it is not there. It helps to search the transcript: on YouTube, open the episode, choose "Show transcript" in the description, and use your browser's find (Cmd+F). You can do it across several days. Save the sheet as you go.
