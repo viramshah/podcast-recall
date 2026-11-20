@@ -67,10 +67,10 @@ You fill in two columns: first the **kind** of question (the column is called `t
 
 Write `video_id@mm:ss`: the 11-character ID from the episode link (the part after `v=`), then the time where the answer **starts**. That means where the speaker **begins** giving the answer, not where they finish. For "who said it" questions, use the moment that person starts saying it. Examples: `abcdefghijk@12:30` or `abcdefghijk@1:02:03`.
 - `single_fact`, `who_when`, `not_in_library`: **one** piece of evidence.
-- `synthesis`: **two or more**, separated by a semicolon: `abcdefghijk@12:30; bcdefghijkl@45:10`.
+- `synthesis`: **the two or three clearest** episodes, separated by a semicolon: `abcdefghijk@12:30; bcdefghijkl@45:10`. Several episodes may touch a topic, so you do not need to list all of them; pick the ones that answer the question most directly.
 - `unanswerable` and `false_premise`: leave it **blank**.
 
-Being within about 15 seconds of the true time is good enough. Beware of the **intro teaser**: many episodes open with a short preview of lines from later. If you find a line in the first few minutes, check whether it is repeated later in a real discussion, and use the later one.
+Being within about 15 seconds of the true time is good enough. Some answers are explained over several minutes (a story, an argument). For those, give the moment where the specific point the question asks about is made. For `not_in_library` and `synthesis` questions the **episode** matters much more than the exact second, so any time inside the right discussion is fine. Beware of the **intro teaser**: many episodes open with a short preview of lines from later. If you find a line in the first few minutes, check whether it is repeated later in a real discussion, and use the later one.
 
 ## How long this takes
 **Plan for 2 to 4 hours**, not one. Each answer sits somewhere in a 30 to 140 minute episode, and you have to find it, or confirm it is not there. It helps to search the transcript: on YouTube, open the episode, choose "Show transcript" in the description, and use your browser's find (Cmd+F). You can do it across several days. Save the sheet as you go.
