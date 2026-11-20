@@ -56,7 +56,7 @@ Split: **dev** items may be used for tuning later; **heldout** items are only fo
 - Evidence: [Why Your Communication Makes People Ignore You & How To Fix  at 14:40](https://youtu.be/BgeNDG5jD60?t=880)
   > I would say the first thing is let's become self-aware. All right. You've never seen yourself communicate to somebody else. You have a view of how you think you communicate. It's not accurate, right? Unless you're a content creator, unless you're watching your videos back, unless you do podcasts all the time, which most people
 
-### sf06: When does he say you should write down a story you might tell later?
+### sf06: In what situations does Vinh Giang say you should write down a story you might tell later?
 - Split: dev `raj`  |  Author: claude
 - **Gold answer:** Whenever something emotionally moves you, grab your phone and document it straight away; the biggest rule of storytelling is to document.
 - Key points: document when emotionally moved; use your phone
@@ -119,7 +119,7 @@ Split: **dev** items may be used for tuning later; **heldout** items are only fo
 - Evidence: [AI Agents Full Course 59 Minutes (for beginners) at 6:21](https://youtu.be/eA9Zf2-qYYM?t=381)
   > facilitates this process and basically facilitates this loop to happen is known as an agent harness. And all of the popular AI agent platforms on the market that you'd be familiar with are just agent harnesses. They're just applications where this loop is facilitated. And I want to actually run this little prompt I prepared
 
-### sf15: How is a skill different from keeping something in an agent's memory?
+### sf15: In the beginner's AI agents course, how is a skill different from keeping something in an agent's memory?
 - Split: dev  |  Author: claude
 - **Gold answer:** A skill packages a whole process as a markdown file (for example writing a proposal) so it is done the same way each time; memory holds preferences and facts. Process material clogs memory and belongs in skills.
 - Key points: skill = packaged process; memory = preferences
@@ -140,7 +140,7 @@ Split: **dev** items may be used for tuning later; **heldout** items are only fo
 - Evidence: [I'm Obsessed With Grok Bot. Here's Why at 14:51](https://youtu.be/1cWZ7Ekff6E?t=891)
   > How have I connected GrokBot to CloudCode? There's two easy ways to do it. There's two ways to do it. The easy way and the way I've done it. The easy way is every bot has a computer, right? So you can literally tell it, hey, log into CloudCode on your computer and it can
 
-### sf18: What did the guest's bot do when he bought a PS5 Pro?
+### sf18: In the Grok Bot episode, what did the bot do when the guest bought a PS5 Pro on eBay?
 - Split: dev  |  Author: claude
 - **Gold answer:** It emailed the eBay seller, negotiated for him and checked that the console was viable.
 - Key points: emailed seller; negotiated; checked viability
@@ -220,10 +220,10 @@ Split: **dev** items may be used for tuning later; **heldout** items are only fo
 - Evidence: [An 86-minute guide to finding PMF | Rob Snyder (Author, The  at 1:15:21](https://youtu.be/19qrLchbQEc?t=4521)
   > And so it becomes this kind of tool. And you can say, you don't look like our case study. So it's probably going to be a lot of work and it might not be a good fit. And you can use it for qualification, disqualification, and for people to understand what you do. That's, that's
 
-### sy07: What do the guests say about how and when to charge customers?
+### sy07: How do the guests describe charging a customer money up front?
 - Split: dev  |  Author: claude
-- **Gold answer:** Jen Abel says price should follow the sales cycle, for example closing in 90 days at 100K, and that for a 30-day value case you charge and credit it back. In the $1M solo business episode the speaker describes charging a business owner $25,000 for an implementation, collecting half up front and half at the end.
-- Key points: price follows sales cycle; charge and credit back; half up front
+- **Gold answer:** Jen Abel says that for a 30-day value case you charge up front and credit it back against the later contract, and that price should follow the sales cycle. In the $1M solo business episode the speaker describes charging a business owner $25,000 for an implementation, collecting half up front and the rest at the end.
+- Key points: charge and credit back; price follows sales cycle; half up front, half at the end
 - Evidence: [How to close $100K+ enterprise deals, step by step | Jen Abe at 59:37](https://youtu.be/YS9In813jJ0?t=3577)
   > Your price should be predicated on your sales cycle, right? Like if you can get a deal done in 90 days for 100K, do that all the time, right? If it takes nine months to get a deal done, you probably should be charging 250, 300K. What are your thoughts on forward deployed engineers as
 - Evidence: [The $1M+ Solo Grok Bot Business (Full Course) at 15:20](https://youtu.be/67BmkptgTms?t=920)
@@ -247,7 +247,7 @@ Split: **dev** items may be used for tuning later; **heldout** items are only fo
 - Evidence: [I'm Obsessed With Grok Bot. Here's Why at 5:06](https://youtu.be/1cWZ7Ekff6E?t=306)
   > I'll give you a very clear example. Pluto is one of my apps that I've been working on for some time, and we're doing a slight pivot. And the pivot is basically we want to be able for people to use Pluto, and then with the data that is in the Pluto app and their
 
-### sy10: How do the guests suggest deciding who to approach first when selling or distributing a product?
+### sy10: How do the guests suggest identifying the right buyers or partner companies to approach first?
 - Split: dev `raj`  |  Author: claude
 - **Gold answer:** Sachin Puri suggests asking an AI which markets use the product, who the customers are and which channels reach them, then building a profile of 10 to 20 partner companies. Jen Abel says to work out who carries weight in the buyer's company: the general counsel or head of legal at the top, with VPs and directors beneath.
 - Key points: markets, customers, channels; 10 to 20 partners; head of legal, VPs, directors

@@ -49,5 +49,7 @@ On 2026-11-20 the PM asked for a "clone of Jainam". A fresh agent was briefed wi
 - **The labeller's own doubts:** the four synthesis questions are broad; `sf06` has an ambiguous "he" and "when"; `sf15` and `sf18` do not say which episode ("the guest"); `fp01` is false-premise while `un01` is unanswerable.
 - **Instruction gaps it reported, now fixed:** no rule for how many synthesis entries are enough (now "the two or three clearest"), and no rule for the time of an explanation that spans minutes.
 
-### Suggested question changes (not yet applied; the PM decides)
+### Question changes (applied 2026-11-20 at the PM's request)
 `sf06` (name the speaker or topic; change "When does he say" to "In what situations"), `sf15` and `sf18` (name the show or episode so "the guest" is clear), `sy07` and `sy10` (narrow them, for example `sy10`: "How do the guests suggest finding distribution partners or channels for a product?").
+
+**Applied:** `sf06` now reads "In what situations does Vinh Giang say you should write down a story you might tell later?"; `sf15` and `sf18` now name the course or episode; `sy07` is narrowed to "How do the guests describe charging a customer money up front?" (gold answer and key points updated to match); `sy10` is narrowed to "How do the guests suggest identifying the right buyers or partner companies to approach first?" (gold evidence unchanged). Only these five rows were patched in `golden_v0.csv`. The review sheet and Jainam's `labelling_sheet.csv` were regenerated (the same 20 ids; no gold answers in it). The two dry-run sheets (`labelling_sheet_claude_dryrun.csv`, `labelling_sheet_agent.csv`) were made on the earlier wording and are kept only as a record.
