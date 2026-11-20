@@ -1,6 +1,6 @@
 # Week 2: Evaluation First, Results (in progress)
 
-Recorded 2026-11-18. Spec: `validation.md` (v2). Automated: 435 tests pass, lint clean.
+Recorded 2026-11-18. Spec: `validation.md` (v2). Automated: 436 tests pass, lint clean.
 
 ## Built
 Answer format, golden set loader, checkers R1, R2, R5 and R7, oracle and fabricator (six modes), scorecard, kappa, golden-set checks, and the `eval` commands (`run`, `retrieval`, `check`, `show`, `kappa`, `sheet`).
@@ -53,3 +53,10 @@ On 2026-11-20 the PM asked for a "clone of Jainam". A fresh agent was briefed wi
 `sf06` (name the speaker or topic; change "When does he say" to "In what situations"), `sf15` and `sf18` (name the show or episode so "the guest" is clear), `sy07` and `sy10` (narrow them, for example `sy10`: "How do the guests suggest finding distribution partners or channels for a product?").
 
 **Applied:** `sf06` now reads "In what situations does Vinh Giang say you should write down a story you might tell later?"; `sf15` and `sf18` now name the course or episode; `sy07` is narrowed to "How do the guests describe charging a customer money up front?" (gold answer and key points updated to match); `sy10` is narrowed to "How do the guests suggest identifying the right buyers or partner companies to approach first?" (gold evidence unchanged). Only these five rows were patched in `golden_v0.csv`. The review sheet and Jainam's `labelling_sheet.csv` were regenerated (the same 20 ids; no gold answers in it). The two dry-run sheets (`labelling_sheet_claude_dryrun.csv`, `labelling_sheet_agent.csv`) were made on the earlier wording and are kept only as a record.
+
+## Second model-labeller run, on the reworded sheet (NOT the D6 gate)
+On 2026-11-20 a second fresh agent, with no context and the updated instructions, labelled the reworded 20-question sheet (`data/golden/labelling_sheet_agent2.csv`). Same caveats as the first run: a model, not Jainam.
+- **Type: 20 of 20 agree, kappa 1.00.** Two independent cold readers on different wording both agree with the gold types, so the type definitions look clear. (The caveat that the tie-break rules were in its instructions still applies.)
+- **Same episodes: 94%.** The one difference is `sy10` (it chose Sachin Puri and Rob Snyder; the gold has Sachin Puri and Jen Abel).
+- **Time within 15 s: 100% on the 10 single-fact and who/when items.** The earlier 62% mixed in explanation and synthesis questions whose time is never scored, where answers span minutes (`nl01` 97 s, `nl03` 51 s, `sy01` 37 s, `sy04` up to 258 s, `sy07` 603 s). `eval kappa` now reports time agreement only for the timed types, with the item count, and episode agreement for all.
+- **Its doubts:** `un01` and `un04` could be `false_premise` as well as `unanswerable` ("how does X say to do Y" when X never discussed Y); `sy04`, `sy07` and `sy10` are broad (for `sy07`, "up front" could mean a pilot fee or a project deposit); `ww04` ("who") is ambiguous because the host attributes the idea to someone else; the instructions did not say how to write times past one hour (`h:mm:ss`).

@@ -33,7 +33,8 @@ class AgreementReport:
     kappa: float
     type_agreement: float
     episode_agreement: float | None  # of the items both label as answerable-with-evidence
-    time_agreement: float | None
+    time_agreement: float | None  # single-fact and who/when items only: the types whose time is scored (R7)
+    time_items: int = 0
     disagreements: list[tuple[str, str, str]] = field(default_factory=list)  # id, type A, type B
 
     @property
@@ -100,23 +101,26 @@ def compare(a: dict[str, Label], b: dict[str, Label]) -> AgreementReport:
     kappa = cohens_kappa(types_a, types_b)
     same_type = sum(1 for x, y in zip(types_a, types_b, strict=True) if x == y)
     both_evidence = [i for i in shared if a[i].evidence and b[i].evidence]
-    same_episode = same_time = 0
+    same_episode = same_time = timed = 0
     for i in both_evidence:
         eps_a = {e.video_id for e in a[i].evidence}
         eps_b = {e.video_id for e in b[i].evidence}
+        is_timed = a[i].type in golden.TIMED_TYPES and b[i].type in golden.TIMED_TYPES
+        timed += int(is_timed)
         if eps_a == eps_b:
             same_episode += 1
             close = all(
                 any(abs(x.start_s - y.start_s) <= R7_TOLERANCE_S for y in b[i].evidence if y.video_id == x.video_id)
                 for x in a[i].evidence
             )
-            same_time += int(close)
+            same_time += int(close and is_timed)
     return AgreementReport(
         n=len(shared),
         kappa=kappa,
         type_agreement=same_type / len(shared),
         episode_agreement=same_episode / len(both_evidence) if both_evidence else None,
-        time_agreement=same_time / len(both_evidence) if both_evidence else None,
+        time_agreement=same_time / timed if timed else None,
+        time_items=timed,
         disagreements=[(i, a[i].type, b[i].type) for i in shared if a[i].type != b[i].type],
     )
 
@@ -130,7 +134,11 @@ def format_report(report: AgreementReport) -> str:
     ]
     if report.episode_agreement is not None:
         lines.append(f"Same gold episode(s): {report.episode_agreement:.0%}")
-        lines.append(f"Gold time within {R7_TOLERANCE_S:g} s: {report.time_agreement:.0%}")
+        if report.time_agreement is not None:
+            lines.append(
+                f"Gold time within {R7_TOLERANCE_S:g} s (single-fact and who/when only, "
+                f"{report.time_items} items): {report.time_agreement:.0%}"
+            )
     for item_id, a, b in report.disagreements:
         lines.append(f"  disagreement on {item_id}: A says {a}, B says {b}")
     return "\n".join(lines)

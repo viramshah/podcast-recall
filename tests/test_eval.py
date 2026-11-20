@@ -755,6 +755,19 @@ class Agreement(Base):
         self.assertFalse(report.meets_gate)
         self.assertIn("BELOW THE GATE", agreement.format_report(report))
 
+    def test_time_agreement_counts_only_the_types_whose_time_is_scored(self):
+        a = self.labels({"q1": ("single_fact", [("abcdefghijk", 100)]),
+                         "q2": ("synthesis", [("abcdefghijk", 100), ("bcdefghijkl", 50)]),
+                         "q3": ("not_in_library", [("cdefghijklm", 300)])})
+        b = self.labels({"q1": ("single_fact", [("abcdefghijk", 105)]),
+                         "q2": ("synthesis", [("abcdefghijk", 900), ("bcdefghijkl", 400)]),
+                         "q3": ("not_in_library", [("cdefghijklm", 900)])})
+        report = agreement.compare(a, b)
+        self.assertEqual(report.episode_agreement, 1.0)  # same episodes everywhere
+        self.assertEqual(report.time_items, 1)  # only q1 is a timed type
+        self.assertEqual(report.time_agreement, 1.0)  # minutes apart on q2 and q3 do not count
+        self.assertIn("single-fact and who/when only, 1 items", agreement.format_report(report))
+
     def test_perfect_agreement_meets_the_gate(self):
         a = self.labels({f"q{i}": ("single_fact" if i % 2 else "unanswerable", []) for i in range(10)})
         report = agreement.compare(a, dict(a))
