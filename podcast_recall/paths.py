@@ -102,6 +102,16 @@ def chunk_overlap_seconds() -> float:
     return value
 
 
+def intro_weight() -> float:
+    """The factor applied to the score of chunks from an episode's opening minutes
+    (`PODCAST_RECALL_INTRO_WEIGHT`). 1 means no change, which is the default; the 2026-11-20
+    experiments found 0.5 helps on the dev questions but was not confirmed on the held-out ones."""
+    value = _number_setting("PODCAST_RECALL_INTRO_WEIGHT", 1.0)
+    if value < 0:
+        raise ConfigError("PODCAST_RECALL_INTRO_WEIGHT cannot be negative.")
+    return value
+
+
 def index_lock_path() -> Path:
     return data_home() / "index.lock"
 

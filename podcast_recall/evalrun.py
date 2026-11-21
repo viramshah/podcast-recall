@@ -233,6 +233,14 @@ class RetrievalOutcome:
     rank: int | None  # timed types: rank of the chunk holding the gold time
     episode_recall: float | None  # synthesis: share of gold episodes in the top 5
     leaked: bool  # a hit came from an episode outside the library (must never happen)
+    deep_rank: int | None = None  # a miss, searched again 50 deep with no per-episode cap
+    gold_distance: float | None = None  # the meaning distance of the right chunk in that deep search
+    top: list = field(default_factory=list)  # the first few hits actually returned (for a miss)
+
+    @property
+    def id_missed(self) -> bool:
+        """A single-fact or who/when question whose right chunk is not in the top 5."""
+        return self.type in TIMED_TYPES and not (self.rank and self.rank <= 5)
 
     @property
     def recall_ok(self) -> bool:
@@ -240,24 +248,37 @@ class RetrievalOutcome:
         return self.episode_recall is not None
 
 
-def retrieval_outcomes(items, ctx: EvalContext, search) -> list[RetrievalOutcome]:
+def retrieval_outcomes(items, ctx: EvalContext, search, deep_search=None) -> list[RetrievalOutcome]:
     """`search(question)` returns a list of SearchHit. Answerable types are scored on the gold
-    evidence. Every question is also checked for results leaking out of the library."""
+    evidence. Every question is also checked for results leaking out of the library. When
+    `deep_search` is given, each miss is searched again (deeper, with no per-episode cap) to show
+    where the right chunk really ranks."""
     outcomes = []
     for item in items:
         hits = search(item.question)
         leaked = any(h.episode_id not in ctx.library_episode_ids for h in hits)
         rank, recall = None, None
+        deep_rank = gold_distance = None
+        top: list = []
         if item.type in TIMED_TYPES and item.evidence:
             gold = item.evidence[0]
             episode_id = ctx.video_to_episode.get(gold.video_id)
             if episode_id is not None:
                 rank = probe.gold_rank(hits, episode_id, gold.start_s)
+                if (rank is None or rank > 5) and deep_search is not None:
+                    deep = deep_search(item.question)
+                    deep_rank = probe.gold_rank(deep, episode_id, gold.start_s)
+                    found = next((h for h in deep if probe.holds_gold(h, episode_id, gold.start_s)), None)
+                    gold_distance = found.vector_distance if found else None
+                    top = list(hits[:3])
         elif item.type == SYNTHESIS and item.evidence:
             gold_eps = {ctx.video_to_episode.get(e.video_id) for e in item.evidence} - {None}
             top = {h.episode_id for h in hits[:5]}
             recall = len(gold_eps & top) / len(gold_eps) if gold_eps else None
-        outcomes.append(RetrievalOutcome(item.id, item.type, item.split, item.tags, rank, recall, leaked))
+        outcomes.append(
+            RetrievalOutcome(item.id, item.type, item.split, item.tags, rank, recall, leaked,
+                             deep_rank, gold_distance, top)
+        )
     return outcomes
 
 

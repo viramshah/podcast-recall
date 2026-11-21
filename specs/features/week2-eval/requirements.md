@@ -102,7 +102,7 @@ Golden set and labels live in `data/golden/` (CSV, committed: private repo, shor
 1. Week 2 covers: rubric, golden set v0, deterministic checkers, kappa script, harness skeleton, retrieval recall on the golden set. The judge and the release gate come in Weeks 3 and 4.
 2. The corpus is the 16 seed episodes.
 3. The assistant drafts 60 candidate questions from the transcripts; the PM reviews each (about 3 hours).
-4. D6: **Jainam** second-labels 20 items (decided 2026-11-18).
+4. D6: **Jainam** second-labels 20 items (decided 2026-11-18). **Met provisionally on 2026-11-20 by three cold model readers (kappa 1.00); Jainam has not labelled yet.**
 5. Kappa is computed on the question type. Episode and time agreement are reported as percentages.
 6. If kappa is below 0.7: rewrite the ambiguous items and label again.
 7. R1 similarity: lowercase, strip punctuation, find the best-matching run of words of the quote's length inside the cited window, and require at least 0.90 word similarity (difflib ratio).
@@ -117,7 +117,7 @@ Golden set and labels live in `data/golden/` (CSV, committed: private repo, shor
 16. The v0 mix of 60: 20 single-fact, 13 synthesis, 10 who/when, 7 unanswerable, 5 false premise, 5 not-in-library.
 17. 11 episodes form the evaluation library (`data/golden/eval_library.csv`); 5 are held back as "indexed but not in the library" (`data/golden/held_out_episodes.csv`). The assistant proposed the split and the PM can veto it. Rule used: a held-out episode's topic must be distinct from every library episode, so a "not in the library" question cannot be answered legitimately from the library. Held out: Diet Expert (Raj Shamani), Inside the black box of AI, Meta's Muse, Why PMs are suddenly valuable again (all Lenny's), and The 9 Stages of AI Agent Adoption (Greg Isenberg). Library: Gita Gopinath, Sachin Puri and Vinh Giang (Raj Shamani, 3 of the 11); Josh Woodward, Jen Abel and Rob Snyder (Lenny's); and five Greg Isenberg episodes.
 18. A script checks that each gold time exists in its transcript and that unanswerable and false-premise items are absent from the transcripts.
-19. Natural wording that differs from the speaker's; at least a third written by the PM from memory; the Raj Shamani episodes included in proportion and tagged `raj` (D11).
+19. Natural wording that differs from the speaker's; at least a third written by the PM from memory (**met in numbers on 2026-11-20 by a stand-in: 20 of 60 are authored `pm_proxy`; 8 by the reviewer agent and 32 by the assistant; none by the PM himself**); the Raj Shamani episodes included in proportion and tagged `raj` (D11).
 20. 20 of the 60 are held out and never used for tuning.
 21. Checkers are pure functions returning pass or fail with a reason, tested with an oracle and a fabricator.
 22. Recall@5 on the golden set replaces the 20-question probe; the probe file stays for history.

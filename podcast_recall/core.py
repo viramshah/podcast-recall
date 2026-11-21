@@ -594,10 +594,14 @@ def eval_retrieval(
     library_video_ids,
     *,
     split: str = "all",
+    diagnose: bool = False,
+    intro_weight: float | None = None,
+    intro_seconds: float | None = None,
     services: indexer.IndexServices | None = None,
     conn=None,
 ):
-    """Recall@5 and friends on the golden questions, searching the evaluation library."""
+    """Recall@5 and friends on the golden questions, searching the evaluation library. With
+    `diagnose`, every miss is searched again, 50 deep with no per-episode cap."""
     chosen = [i for i in items if split == "all" or i.split == split]
     services = services or indexer.IndexServices()
     with _Db(conn) as db:
@@ -607,10 +611,17 @@ def eval_retrieval(
         def search(question: str):
             return retrieval.find(
                 db, embedder, question, OWNER, video_ids=library_video_ids, limit=10,
-                use_vectors=services.use_vectors,
+                use_vectors=services.use_vectors, intro_weight=intro_weight, intro_seconds=intro_seconds,
             ).hits
 
-        return evalrun.retrieval_outcomes(chosen, ctx, search)
+        def deep_search(question: str):
+            return retrieval.find(
+                db, embedder, question, OWNER, video_ids=library_video_ids, limit=retrieval.MAX_LIMIT,
+                per_episode=retrieval.MAX_LIMIT, use_vectors=services.use_vectors,
+                intro_weight=intro_weight, intro_seconds=intro_seconds,
+            ).hits
+
+        return evalrun.retrieval_outcomes(chosen, ctx, search, deep_search if diagnose else None)
 
 
 def eval_check_golden(items, library_video_ids, *, conn=None):

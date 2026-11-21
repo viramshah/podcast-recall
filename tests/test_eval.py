@@ -638,6 +638,32 @@ class RetrievalOnGolden(EvalBase):
         outcomes = evalrun.retrieval_outcomes(self.items(), self.ctx, leaky)
         self.assertTrue(all(o.leaked for o in outcomes if o.item_id != "r4") or any(o.leaked for o in outcomes))
 
+    def test_a_miss_is_searched_again_deeper_to_show_where_the_right_chunk_really_ranks(self):
+        from podcast_recall.models import SearchHit
+
+        def hit(episode_id, start, end, distance):
+            return SearchHit(1, episode_id, "s", "t", start, end, "x", None, None, None, 1, distance, 0.1)
+
+        ep = self.ctx.video_to_episode[vid(304)]
+        wrong = [hit(999, 0, 100, 0.30), hit(998, 0, 100, 0.31)]
+        deep = [hit(999, 0, 100, 0.30)] * 11 + [hit(ep, 0, 100, 0.42)]  # the right chunk is 12th
+        gold = item("r1", golden.SINGLE_FACT, "What?", [Evidence(vid(304), 5.0)])
+        with_deep = evalrun.retrieval_outcomes([gold], self.ctx, lambda q: wrong, lambda q: deep)[0]
+        self.assertTrue(with_deep.id_missed)
+        self.assertEqual((with_deep.deep_rank, with_deep.gold_distance), (12, 0.42))
+        self.assertEqual(len(with_deep.top), 2)
+        plain = evalrun.retrieval_outcomes([gold], self.ctx, lambda q: wrong)[0]
+        self.assertIsNone(plain.deep_rank)  # no deeper search was asked for
+        found = evalrun.retrieval_outcomes([gold], self.ctx, lambda q: [hit(ep, 0, 100, 0.2)], lambda q: deep)[0]
+        self.assertFalse(found.id_missed)
+        self.assertIsNone(found.deep_rank)  # a hit needs no diagnosis
+
+    def test_diagnose_runs_through_the_core_function(self):
+        outcomes = core.eval_retrieval(self.items(), self.library, diagnose=True, services=self.services, conn=self.conn)
+        missed = [o for o in outcomes if o.id_missed]
+        self.assertEqual([o.item_id for o in missed], ["r2"])  # the jazz episode is outside the library
+        self.assertIsNone(missed[0].deep_rank)
+
     def test_the_split_filter_applies(self):
         items = self.items()
         items[0] = GoldenItem("r1", golden.SINGLE_FACT, items[0].question, "a", (), items[0].evidence, "pm", "heldout", (), "")

@@ -550,8 +550,13 @@ def cmd_eval_run(args) -> int:
 def cmd_eval_retrieval(args) -> int:
     items, library = _golden_and_library(args)
     services = indexer.IndexServices(use_vectors=not args.no_vectors)
-    outcomes = core.eval_retrieval(items, library, split=args.split, services=services)
+    outcomes = core.eval_retrieval(
+        items, library, split=args.split, diagnose=args.diagnose, intro_weight=args.intro_weight,
+        intro_seconds=args.intro_seconds, services=services,
+    )
     s = evalrun.retrieval_summary(outcomes)
+    if args.intro_weight not in (None, 1.0):
+        print(f"Opening chunks (first {args.intro_seconds or 180:g} s) weighted by {args.intro_weight:g}")
     print(f"Questions with a gold time (single-fact, who/when): {s['timed_n']}")
     print(f"Recall@5:  {s['recall_at_5']:.0%}   (target 85%)")
     print(f"Recall@10: {s['recall_at_10']:.0%}")
@@ -563,6 +568,22 @@ def cmd_eval_retrieval(args) -> int:
     print(f"Results from outside the library: {s['leaks']}   (must be 0)")
     if s["misses"]:
         print("Missed: " + ", ".join(s["misses"]))
+    if args.diagnose:
+        questions = {i.id: i for i in items}
+        for outcome in outcomes:
+            if outcome.id_missed:
+                item = questions[outcome.item_id]
+                gold = item.evidence[0]
+                where = (
+                    f"rank {outcome.deep_rank} of 50 with no per-episode cap (meaning distance "
+                    f"{'n/a' if outcome.gold_distance is None else f'{outcome.gold_distance:.3f}'})"
+                    if outcome.deep_rank else "not in the top 50 at all"
+                )
+                print(f"\n{outcome.item_id}: {item.question}")
+                print(f"  the right chunk ({gold.video_id} at {golden.format_time(gold.start_s)}) is {where}")
+                for hit in outcome.top:
+                    distance = "-" if hit.vector_distance is None else f"{hit.vector_distance:.3f}"
+                    print(f"    returned: {hit.title[:44]} at {golden.format_time(hit.start_s)} (distance {distance})")
     return EXIT_PARTIAL if s["leaks"] else EXIT_OK
 
 
@@ -757,6 +778,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = eadd("retrieval", cmd_eval_retrieval, "Measure recall@5 on the golden questions.")
     p.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
     p.add_argument("--no-vectors", action="store_true", help="keyword search only")
+    p.add_argument("--diagnose", action="store_true",
+                   help="for each miss, show where the right chunk ranks in a deeper search with no per-episode cap")
+    p.add_argument("--intro-weight", type=float, default=None,
+                   help="multiply the score of chunks from an episode's first minutes by this (default 1, no change)")
+    p.add_argument("--intro-seconds", type=float, default=None,
+                   help="what counts as an episode's opening, in seconds (default 180)")
     eadd("check", cmd_eval_check, "Check the golden set itself: evidence exists, absent answers are absent.")
     p = eadd("show", cmd_eval_show, "Show one question with the transcript text at its gold time.")
     p.add_argument("item_id")

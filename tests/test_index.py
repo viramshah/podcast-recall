@@ -1006,3 +1006,97 @@ class Starvation(IndexBase):
         self.build()
         result = self.find("quokkas", limit=8)
         self.assertEqual(len(result.hits), 1)
+
+
+# ---------------------------------------------------------------------------- opening chunks
+
+
+class OpeningChunks(IndexBase):
+    """An episode's opening (teaser and host summary) must not crowd out the passage that answers."""
+
+    def setUp(self):
+        super().setUp()
+        opening = ["Today we cover the quokka diet, the quokka habitat and the quokka diet again."] * 12
+        filler = [f"Filler sentence number {i} about the weather and nothing else." for i in range(88)]
+        answer = ["The quokka diet is mostly grass and leaves."]
+        later = [f"More filler sentence number {i} about trains and nothing else." for i in range(50)]
+        self.world.add_episode(501, 1, "Long show", "2026-10-01T10:00:00", opening + filler + answer + later)  # 750 s
+        self.world.add_episode(502, 1, "Short show", "2026-10-02T10:00:00",
+                               ["Today we cover the quokka diet and the quokka habitat."] * 3 + ["Quokka diet is grass."])
+        self.build()
+
+    def starts(self, **kwargs):
+        hits = self.find("quokka diet", use_vectors=False, per_episode=10, limit=20, **kwargs).hits
+        return [(h.episode_id, round(h.start_s)) for h in hits if h.episode_id == 501]
+
+    def test_by_default_nothing_changes(self):
+        self.assertEqual(self.starts(), self.starts(intro_weight=1.0))
+        self.assertEqual(self.starts()[0][1], 0)  # the opening matches best
+
+    def test_demoting_the_opening_lets_the_real_answer_win(self):
+        plain = self.find("quokka diet", use_vectors=False, per_episode=10, limit=20).hits
+        self.assertNotIn("grass and leaves", plain[0].text)  # without it, the opening wins
+        demoted = self.find("quokka diet", use_vectors=False, per_episode=10, limit=20, intro_weight=0.1).hits
+        first_long = next(h for h in demoted if h.episode_id == 501)
+        self.assertIn("grass and leaves", first_long.text)  # the chunk with the answer is now first
+        last_long = [h for h in demoted if h.episode_id == 501][-1]
+        self.assertLess(last_long.start_s, 180)  # the opening is still returned, just lower
+
+    def test_a_weight_of_zero_puts_openings_last(self):
+        starts = [t for _e, t in self.starts(intro_weight=0)]
+        self.assertTrue(starts[0] >= 180 and starts[-1] < 180)
+
+    def test_a_short_episode_is_not_demoted(self):
+        for weight in (1.0, 0.0):
+            hits = self.find("quokka diet", use_vectors=False, intro_weight=weight).hits
+            self.assertIn(502, [h.episode_id for h in hits])
+        first = self.find("quokka diet", use_vectors=False, intro_weight=0.0, episode_ids=[502]).hits[0]
+        self.assertEqual(first.start_s, 0.0)  # the short episode's first chunk keeps its place
+
+    def test_the_opening_length_can_be_changed(self):
+        # with a 10 second "opening", the first chunk (it starts at 0) still counts, but a chunk starting later does not
+        long_opening = self.starts(intro_weight=0.1, intro_seconds=1000)
+        self.assertGreater(len(long_opening), 0)
+
+    def test_the_setting_turns_it_on_for_every_search_and_bad_values_are_errors(self):
+        import os
+
+        self.addCleanup(os.environ.pop, "PODCAST_RECALL_INTRO_WEIGHT", None)
+        self.assertEqual(paths.intro_weight(), 1.0)  # off by default
+        os.environ["PODCAST_RECALL_INTRO_WEIGHT"] = "0.1"
+        self.assertEqual(paths.intro_weight(), 0.1)
+        hits = self.find("quokka diet", use_vectors=False, per_episode=10, limit=20).hits
+        first_long = next(h for h in hits if h.episode_id == 501)
+        self.assertIn("grass and leaves", first_long.text)  # no argument needed: the setting applies
+        explicit = self.find("quokka diet", use_vectors=False, per_episode=10, limit=20, intro_weight=1.0).hits
+        self.assertNotIn("grass and leaves", next(h for h in explicit if h.episode_id == 501).text)  # an argument wins
+        for bad in ("-1", "abc"):
+            os.environ["PODCAST_RECALL_INTRO_WEIGHT"] = bad
+            with self.assertRaises(ConfigError, msg=bad):
+                paths.intro_weight()
+
+    def test_negative_values_are_rejected(self):
+        for kwargs in ({"intro_weight": -1}, {"intro_seconds": -5}):
+            with self.assertRaises(ConfigError):
+                self.find("quokka", **kwargs)
+
+    def test_it_reaches_the_search_through_the_core_function(self):
+        items = [GoldenItemForTest.single("t1", "What is the quokka diet?", vid(501), 440.0)]
+        ctx_library = [vid(501), vid(502)]
+        plain = core.eval_retrieval(items, ctx_library, services=self.services, conn=self.conn)[0]
+        demoted = core.eval_retrieval(items, ctx_library, intro_weight=0.1, services=self.services, conn=self.conn)[0]
+        self.assertTrue(demoted.rank is not None)
+        self.assertLessEqual(demoted.rank, plain.rank or 99)
+
+
+class GoldenItemForTest:
+    @staticmethod
+    def single(item_id, question, video_id, at_s):
+        from podcast_recall import golden
+
+        return golden.GoldenItem(item_id, golden.SINGLE_FACT, question, "Grass and leaves.", (),
+                                 (golden.Evidence(video_id, at_s),), "pm", "dev", (), "")
+
+
+def vid(episode_id: int) -> str:
+    return f"vid{episode_id:08d}"

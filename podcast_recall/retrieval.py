@@ -12,7 +12,7 @@ import sqlite3
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
-from podcast_recall import jobs, vectors
+from podcast_recall import jobs, paths, vectors
 from podcast_recall.errors import ApiError, ConfigError
 from podcast_recall.models import SearchHit, SearchResult
 
@@ -20,6 +20,9 @@ CANDIDATES = 30  # taken from each method before they are combined
 MAX_CANDIDATES = 480  # the most taken when the per-episode cap leaves too few results
 RRF_CONSTANT = 60
 SEMANTIC_WEIGHT = 1.0  # how much the meaning ranking counts against the keyword ranking
+INTRO_SECONDS = 180.0  # chunks starting before this are an episode's opening (teaser and host summary)
+INTRO_WEIGHT = 1.0  # the factor applied to an opening chunk's score; 1.0 changes nothing
+MIN_EPISODES_LENGTH_FACTOR = 4  # openings are only demoted in episodes at least this many times longer
 DEFAULT_LIMIT = 8
 MAX_LIMIT = 50
 DEFAULT_PER_EPISODE = 3
@@ -177,6 +180,42 @@ def fuse(
     return sorted(scores.items(), key=lambda kv: (-kv[1], position.get(kv[0], 10**9), kv[0]))
 
 
+def demote_intro(
+    conn: sqlite3.Connection,
+    ranked: Sequence[tuple[int, float]],
+    seconds: float,
+    weight: float,
+) -> list[tuple[int, float]]:
+    """Multiply the score of chunks from an episode's opening by `weight` and re-sort.
+
+    An episode opens with a teaser and a host summary of everything to come. Those chunks read like
+    a table of contents and match almost any question about the episode, so they crowd out the
+    passage that really answers it. Only chunks that start before `seconds` are touched, and only
+    in episodes much longer than that (a short episode is mostly "opening"). A weight of 1 changes
+    nothing; 0 pushes openings to the bottom.
+    """
+    if weight == 1.0 or seconds <= 0 or not ranked:
+        return list(ranked)
+    marks = ",".join("?" * len(ranked))
+    info = {
+        r["chunk_id"]: (r["start_s"], r["length"])
+        for r in conn.execute(
+            "SELECT c.chunk_id, c.start_s, "
+            "(SELECT MAX(end_s) FROM chunks WHERE episode_id = c.episode_id) AS length "
+            f"FROM chunks c WHERE c.chunk_id IN ({marks})",
+            [c for c, _ in ranked],
+        )
+    }
+    order = {c: i for i, (c, _score) in enumerate(ranked)}
+    adjusted = []
+    for chunk_id, score in ranked:
+        start, length = info.get(chunk_id, (None, None))
+        if start is not None and start < seconds and (length or 0) >= MIN_EPISODES_LENGTH_FACTOR * seconds:
+            score *= weight
+        adjusted.append((chunk_id, score))
+    return sorted(adjusted, key=lambda kv: (-kv[1], order[kv[0]]))
+
+
 # ---------------------------------------------------------------------------- the entry point
 
 
@@ -268,6 +307,8 @@ def find(
     per_episode: int = DEFAULT_PER_EPISODE,
     use_vectors: bool = True,
     semantic_weight: float | None = None,
+    intro_weight: float | None = None,
+    intro_seconds: float | None = None,
 ) -> SearchResult:
     """Search the user's library, or, with `video_ids`, exactly those videos' episodes instead."""
     if not 1 <= limit <= MAX_LIMIT:
@@ -277,6 +318,10 @@ def find(
     weight = SEMANTIC_WEIGHT if semantic_weight is None else semantic_weight
     if weight < 0:
         raise ConfigError("semantic_weight cannot be negative.")
+    intro_w = paths.intro_weight() if intro_weight is None else intro_weight
+    intro_s = INTRO_SECONDS if intro_seconds is None else intro_seconds
+    if intro_w < 0 or intro_s < 0:
+        raise ConfigError("intro_weight and intro_seconds cannot be negative.")
     phrases, words = parse_query(query)
     expression = fts_expression(phrases, words)
     if expression is None:
@@ -306,7 +351,8 @@ def find(
         keyword = keyword_search(conn, expression, k)
         semantic = vector_search(conn, query_vector, k) if query_vector is not None else []
         hits = _build_hits(
-            conn, fuse(keyword, [c for c, _ in semantic], weight), keyword, semantic,
+            conn, demote_intro(conn, fuse(keyword, [c for c, _ in semantic], weight), intro_s, intro_w),
+            keyword, semantic,
             user_id=user_id, video_ids=video_ids, limit=limit, per_episode=per_episode,
         )
         exhausted = len(keyword) < k and (query_vector is None or len(semantic) < k)

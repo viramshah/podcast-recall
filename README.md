@@ -31,6 +31,7 @@ Settings come only from environment variables.
 | `PODCAST_RECALL_OLLAMA_URL` | `http://127.0.0.1:11434` | Where Ollama listens. Only a loopback address is accepted. |
 | `PODCAST_RECALL_CHUNK_SECONDS` | `120` | Target length of a search chunk (15 to 300). Changing it makes the next `index build` redo every episode. Used for tuning. |
 | `PODCAST_RECALL_CHUNK_OVERLAP_SECONDS` | 20% of the chunk length (`24`) | How far each chunk reaches back into the one before (0 to half the chunk length). |
+| `PODCAST_RECALL_INTRO_WEIGHT` | `1` (no change) | Multiplies the search score of chunks from an episode's first 3 minutes (the teaser and host summary), which can crowd out the real answer. 0.5 helped on the dev questions but was not confirmed on the held-out ones, so it is off by default. |
 
 ## Commands
 
@@ -106,6 +107,8 @@ uv run podcast-recall eval run --oracle                # perfect answers built f
 uv run podcast-recall eval run --fabricate invented_quote   # deliberately wrong answers: must fail
 uv run podcast-recall eval run --answers answers.jsonl --out evals/scorecards/run.csv
 uv run podcast-recall eval retrieval                   # recall@5 on the golden questions
+uv run podcast-recall eval retrieval --diagnose        # ...and for each miss, where the right chunk really ranks
+uv run podcast-recall eval retrieval --split dev --intro-weight 0.25   # try demoting an episode's opening minutes
 uv run podcast-recall eval sheet                       # the sheet for the second labeller (questions only)
 uv run podcast-recall eval kappa --labels-b filled.csv # agreement with the second labeller
 ```
