@@ -244,6 +244,13 @@ def _link_video(
     return row[0] if row else None
 
 
+def video_for_episode(
+    conn: sqlite3.Connection, user_id: str, episode_id: int, video_ids: Sequence[str] | None = None
+) -> str | None:
+    """The YouTube video that stands for this episode in the user's library (or explicit list)."""
+    return _link_video(conn, user_id, episode_id, video_ids)
+
+
 def _build_hits(
     conn: sqlite3.Connection,
     ranked: Sequence[tuple[int, float]],

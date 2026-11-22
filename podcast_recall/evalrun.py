@@ -307,3 +307,51 @@ def retrieval_summary(outcomes: Sequence[RetrievalOutcome]) -> dict:
         },
         "misses": [o.item_id for o in timed if not (o.rank and o.rank <= 5)],
     }
+
+
+# ---------------------------------------------------------------------------- the answering system, run on the golden set
+
+
+def summarize_answering(results: Sequence, latencies_s: Sequence[float]) -> dict:
+    """Status counts, claims kept and dropped (with the reasons) and the time taken, for a run of the
+    real answering system. `results` are `AskResult`s."""
+    statuses: Counter[str] = Counter(r.answer.status for r in results)
+    reasons: Counter[str] = Counter()
+    for r in results:
+        for d in r.dropped:
+            reasons[d.reason.split(":")[0][:80]] += 1
+    ordered = sorted(latencies_s)
+
+    def percentile(p: float) -> float | None:
+        if not ordered:
+            return None
+        return ordered[min(len(ordered) - 1, round(p * (len(ordered) - 1)))]
+
+    return {
+        "questions": len(results),
+        "statuses": dict(statuses),
+        "claims_kept": sum(len(r.answer.claims) for r in results),
+        "claims_dropped": sum(len(r.dropped) for r in results),
+        "drop_reasons": dict(reasons.most_common(6)),
+        "median_s": percentile(0.5),
+        "p90_s": percentile(0.9),
+        "models": sorted({r.model for r in results if r.model}),
+        "model_errors": sum(1 for r in results if any("could not be used" in w for w in r.warnings)),
+    }
+
+
+def format_answering(summary: dict) -> str:
+    def seconds(value) -> str:
+        return "n/a" if value is None else f"{value:.1f} s"
+
+    lines = [
+        f"Questions answered by the system: {summary['questions']} (model: {', '.join(summary['models']) or 'n/a'})",
+        "Answer statuses: " + ", ".join(f"{k} {v}" for k, v in sorted(summary["statuses"].items())),
+        f"Claims shown: {summary['claims_kept']}; claims removed by the verifier: {summary['claims_dropped']}",
+    ]
+    if summary["drop_reasons"]:
+        lines.append("Why claims were removed: " + "; ".join(f"{k} ({v})" for k, v in summary["drop_reasons"].items()))
+    if summary["model_errors"]:
+        lines.append(f"Questions where the model's reply could not be used: {summary['model_errors']}")
+    lines.append(f"Time to answer: median {seconds(summary['median_s'])}, 90th percentile {seconds(summary['p90_s'])} (target: median under 15 s)")
+    return "\n".join(lines)

@@ -21,6 +21,7 @@ from podcast_recall import (
     logging_setup,
     oracle,
     paths,
+    schemas,
 )
 from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, PodcastRecallError
 from podcast_recall.models import FeedInfo, FetchResult, ResolveResult, SyncResult
@@ -547,6 +548,35 @@ def cmd_eval_run(args) -> int:
     return EXIT_PARTIAL if failing else EXIT_OK
 
 
+def cmd_eval_answer(args) -> int:
+    import json
+    from datetime import UTC
+
+    items, library = _golden_and_library(args)
+
+    def progress(position: int, total: int, item_id: str, status: str, seconds: float) -> None:
+        _err(f"[{position}/{total}] {item_id}: {status} ({seconds:.1f} s)")
+
+    count = sum(1 for i in items if args.split == "all" or i.split == args.split)
+    if args.limit is not None:
+        count = min(count, args.limit)
+    _err(f"Answering {count} questions; each can take up to a minute. Progress appears after each one.")
+    answers_by_id, results, latencies, grades = core.answer_golden(
+        items, library, split=args.split, limit=args.limit, on_progress=progress
+    )
+    print(evalrun.format_answering(evalrun.summarize_answering(results, latencies)))
+    print()
+    print(evalrun.format_summary(evalrun.summarize(grades)))
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
+    card = args.out or f"evals/scorecards/answers_{args.split}_{stamp}.csv"
+    evalrun.write_scorecard(card, grades)
+    answers_path = card.rsplit(".", 1)[0] + ".answers.jsonl"
+    with open(answers_path, "w", encoding="utf-8") as handle:
+        handle.writelines(json.dumps(raw, ensure_ascii=False) + "\n" for item_id, raw in answers_by_id.items())
+    print(f"\nWrote {card} and {answers_path}")
+    return EXIT_PARTIAL if any(not g.passed for g in grades) else EXIT_OK
+
+
 def cmd_eval_retrieval(args) -> int:
     items, library = _golden_and_library(args)
     services = indexer.IndexServices(use_vectors=not args.no_vectors)
@@ -623,6 +653,58 @@ def cmd_eval_sheet(args) -> int:
     chosen = agreement.sample_for_second_labeller(golden.load_golden(args.golden), args.count)
     agreement.write_labelling_sheet(args.out, chosen)
     print(f"Wrote {args.out} with {len(chosen)} questions (no gold answers).")
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------- ask
+
+
+def format_answer(response: schemas.AskResponse) -> str:
+    answer = response.answer
+    lines: list[str] = []
+    if answer.status == "not_found":
+        lines.append(answer.summary or "I couldn't find that in your podcasts.")
+    else:
+        if answer.status == "premise_corrected":
+            lines.append("Note: the question assumes something the podcasts do not say.")
+            if answer.summary:
+                lines.append(f"  {answer.summary}" + ("  (not quoted)" if response.note_not_quoted else ""))
+        for number, claim in enumerate(answer.claims, 1):
+            lines.append(f"{number}. {claim.text}")
+            for cite in claim.citations:
+                lines.append(f'   "{cite.quote}"')
+                lines.append(f"   {cite.show}: {cite.title}, at {cite.time}")
+                lines.append(f"   {cite.url}")
+    if response.dropped:
+        word = "statement was" if response.dropped == 1 else "statements were"
+        lines.append(f"({response.dropped} {word} removed because its quote could not be verified.)")
+    for warning in response.warnings:
+        lines.append(f"Warning: {warning}")
+    return "\n".join(lines)
+
+
+def cmd_ask(args) -> int:
+    video_ids = _target_ids(args) if args.seed is not None else None
+    result = core.ask(
+        args.question, args.user, show=args.show, since=args.since, until=args.until,
+        video_ids=video_ids, record=not args.no_record,
+    )
+    response = schemas.ask_response(result)
+    print(response.model_dump_json(indent=2) if args.json else format_answer(response))
+    return EXIT_OK
+
+
+def cmd_serve(args) -> int:
+    import uvicorn
+
+    from podcast_recall import web
+
+    video_ids = _target_ids(args) if args.seed is not None else None
+    app = web.create_app(user_id=args.user, port=args.port, video_ids=video_ids)
+    if video_ids is not None:
+        print(f"Answering from the seed file's {len(video_ids)} episodes, not your whole library.")
+    print(f"Podcast Recall is at http://127.0.0.1:{args.port}  (this computer only; press Ctrl+C to stop)")
+    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return EXIT_OK
 
 
@@ -775,6 +857,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="grade deliberately wrong answers; modes: " + ", ".join(oracle.FABRICATE_MODES))
     p.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
     p.add_argument("--out", metavar="FILE", help="write the per-question scorecard CSV here")
+    p = eadd("answer", cmd_eval_answer, "Answer the golden questions with the real system and grade them.")
+    p.add_argument("--split", choices=("all", "dev", "heldout"), default="dev",
+                   help="which questions (default dev; the held-out split is never used for tuning)")
+    p.add_argument("--limit", type=int, default=None, help="only the first N questions (a quick trial)")
+    p.add_argument("--out", metavar="FILE", help="where to write the scorecard CSV")
     p = eadd("retrieval", cmd_eval_retrieval, "Measure recall@5 on the golden questions.")
     p.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
     p.add_argument("--no-vectors", action="store_true", help="keyword search only")
@@ -793,6 +880,20 @@ def build_parser() -> argparse.ArgumentParser:
     p = eadd("sheet", cmd_eval_sheet, "Write the sheet the second labeller fills in (questions only).", files=False)
     p.add_argument("--out", default=SHEET_PATH, help=f"where to write it (default {SHEET_PATH})")
     p.add_argument("--count", type=int, default=20, help="how many questions (default 20)")
+
+    p = add("ask", cmd_ask, "Ask a question and get an answer with verified citations.")
+    p.add_argument("question", help="your question, in plain English")
+    p.add_argument("--show", help="only this show (part of its name)")
+    p.add_argument("--since", help="only episodes published on or after YYYY-MM-DD")
+    p.add_argument("--until", help="only episodes published on or before YYYY-MM-DD")
+    p.add_argument("--json", action="store_true", help="print the answer as JSON")
+    p.add_argument("--no-record", action="store_true", help="do not store this question and answer")
+    p.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
+                   help=f"answer from the seed file's episodes instead of your library (default file: {DEFAULT_SEED})")
+    p = add("serve", cmd_serve, "Start the local web chat (this computer only).")
+    p.add_argument("--port", type=int, default=8000, help="port to listen on (default 8000)")
+    p.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
+                   help=f"answer from the seed file's episodes instead of your library (default file: {DEFAULT_SEED})")
     return parser
 
 

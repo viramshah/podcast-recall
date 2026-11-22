@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterable
 from contextlib import contextmanager, nullcontext
 
 from podcast_recall import (
+    answering,
     auth,
     evalrun,
     golden_check,
@@ -19,6 +20,7 @@ from podcast_recall import (
     oracle,
     paths,
     podcastindex,
+    requests_store,
     resolve,
     resolve_store,
     retrieval,
@@ -634,3 +636,99 @@ def eval_show_item(item, library_video_ids, *, conn=None) -> str:
     with _Db(conn) as db:
         ctx = evalrun.build_context(db, library_video_ids)
         return golden_check.show_item(item, ctx)
+
+
+# ---------------------------------------------------------------------------- answers (Week 3)
+
+
+def ask(
+    question: str,
+    user_id: str = OWNER,
+    *,
+    show: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    video_ids=None,
+    record: bool = True,
+    services: answering.AnswerServices | None = None,
+    conn=None,
+    now: Callable[[], str] = store.utc_now,
+):
+    """Answer a question from this user's podcasts. Every citation in the answer has been verified
+    (R1 and R2). With `record`, the request is stored so it can get feedback and be saved."""
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        result = answering.answer_question(
+            db, services or answering.AnswerServices(), question, user_id, show=show, since=since,
+            until=until, video_ids=video_ids,
+        )
+        if record:
+            result.request_id = requests_store.log_request(
+                db, user_id, question.strip(), result.answer, result.dropped, result.chunk_ids,
+                result.model, result.latency_ms, now(),
+            )
+        return result
+
+
+def record_feedback(
+    request_id: int, thumbs: int, note: str = "", user_id: str = OWNER, *, conn=None,
+    now: Callable[[], str] = store.utc_now,
+) -> int:
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        return requests_store.add_feedback(db, request_id, user_id, thumbs, note, now())
+
+
+def save_finding(
+    request_id: int, note: str = "", user_id: str = OWNER, *, conn=None,
+    now: Callable[[], str] = store.utc_now,
+) -> int:
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        return requests_store.add_finding(db, request_id, user_id, note, now())
+
+
+def list_findings(user_id: str = OWNER, *, conn=None):
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        return requests_store.list_findings(db, user_id)
+
+
+def answer_golden(
+    items,
+    library_video_ids,
+    *,
+    split: str = "dev",
+    limit: int | None = None,
+    services: answering.AnswerServices | None = None,
+    on_progress=None,
+    conn=None,
+):
+    """Ask the real answering system every golden question of a split, against the evaluation
+    library. Nothing is stored in the request history. Returns (answers, results, latencies, grades)."""
+    chosen = [i for i in items if split == "all" or i.split == split]
+    if limit is not None:
+        chosen = chosen[:limit]
+    services = services or answering.AnswerServices()
+    answers_by_id: dict[str, dict] = {}
+    results = []
+    latencies: list[float] = []
+    with _Db(conn) as db:
+        ctx = evalrun.build_context(db, library_video_ids)
+        for position, item in enumerate(chosen, 1):
+            result = answering.answer_question(
+                db, services, item.question, OWNER, video_ids=library_video_ids
+            )
+            results.append(result)
+            latencies.append(result.latency_ms / 1000)
+            from podcast_recall.answers import answer_to_dict
+
+            answers_by_id[item.id] = {"id": item.id, **answer_to_dict(result.answer)}
+            if on_progress:
+                on_progress(position, len(chosen), item.id, result.answer.status, result.latency_ms / 1000)
+        grades = evalrun.grade_all(chosen, answers_by_id, ctx, "all")
+    return answers_by_id, results, latencies, grades

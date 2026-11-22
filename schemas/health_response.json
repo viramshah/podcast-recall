@@ -1,0 +1,23 @@
+{
+  "properties": {
+    "indexed_episodes": {
+      "title": "Indexed Episodes",
+      "type": "integer"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok",
+    "model",
+    "indexed_episodes"
+  ],
+  "title": "HealthResponse",
+  "type": "object"
+}

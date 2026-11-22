@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "note": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Note",
+      "type": "string"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "type": "integer"
+    },
+    "thumbs": {
+      "enum": [
+        1,
+        -1
+      ],
+      "title": "Thumbs",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "request_id",
+    "thumbs"
+  ],
+  "title": "FeedbackRequest",
+  "type": "object"
+}

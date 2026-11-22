@@ -1,0 +1,54 @@
+{
+  "properties": {
+    "question": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "show": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Show"
+    },
+    "since": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Since"
+    },
+    "until": {
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Until"
+    }
+  },
+  "required": [
+    "question"
+  ],
+  "title": "AskRequest",
+  "type": "object"
+}

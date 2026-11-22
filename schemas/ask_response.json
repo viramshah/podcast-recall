@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "AnswerModel": {
+      "properties": {
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/ClaimModel"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "answered",
+            "not_found",
+            "premise_corrected"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "claims"
+      ],
+      "title": "AnswerModel",
+      "type": "object"
+    },
+    "CitationModel": {
+      "properties": {
+        "episode_id": {
+          "title": "Episode Id",
+          "type": "integer"
+        },
+        "quote": {
+          "title": "Quote",
+          "type": "string"
+        },
+        "show": {
+          "title": "Show",
+          "type": "string"
+        },
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        },
+        "time": {
+          "title": "Time",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "video_id": {
+          "title": "Video Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "video_id",
+        "episode_id",
+        "show",
+        "title",
+        "quote",
+        "start_s",
+        "time",
+        "url"
+      ],
+      "title": "CitationModel",
+      "type": "object"
+    },
+    "ClaimModel": {
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/CitationModel"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "citations"
+      ],
+      "title": "ClaimModel",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "answer": {
+      "$ref": "#/$defs/AnswerModel"
+    },
+    "dropped": {
+      "title": "Dropped",
+      "type": "integer"
+    },
+    "dropped_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dropped Reasons",
+      "type": "array"
+    },
+    "latency_ms": {
+      "title": "Latency Ms",
+      "type": "integer"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "note_not_quoted": {
+      "title": "Note Not Quoted",
+      "type": "boolean"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Request Id"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request_id",
+    "answer",
+    "dropped",
+    "dropped_reasons",
+    "note_not_quoted",
+    "warnings",
+    "latency_ms",
+    "model"
+  ],
+  "title": "AskResponse",
+  "type": "object"
+}

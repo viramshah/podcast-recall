@@ -8,7 +8,7 @@ Change an entry only by editing this file and recording why in `decisions.md`.
 | Transcription | The publisher's transcript file when one exists (D13), otherwise `mlx-whisper` (fallback `whisper.cpp`), local, word timestamps | $0 | Saves hours of compute for episodes that have one; timestamps power citations |
 | Embeddings | `nomic-embed-text` via Ollama (or a `bge` model via sentence-transformers) | $0 | Local, small |
 | Reranker | **None in U4** (D17). Added only if recall@5 falls short; Ollama cannot serve rerankers, so the options are a local PyTorch model or the answer model | $0 | Avoids a large dependency until it is shown to be needed |
-| Answer LLM | One 7-9B instruct model via Ollama | $0 | Sized for 16GB RAM |
+| Answer LLM | `qwen2.5:7b-instruct` via Ollama (temperature 0, JSON-schema output, 8192 context). Returns pointers to transcript units, never quotes (D19) | $0 | Sized for 16GB RAM; `llama3.1:8b` speed is measured in Week 3 as the fallback |
 | Judge LLM | A model from a different family than the answer model | $0 | Reduces self-preference bias |
 | Storage and search | SQLite, FTS5 (porter stemming), `sqlite-vec` (cosine), reciprocal rank fusion | $0 | One file, no server. About 1,000 chunks for the 16 seed episodes |
 | Core library | Plain Python package: `sync_library`, `fetch_videos`, `list_channels`, `set_podcast_channel`, `revoke`, `purge_stale_videos`, `build_index`, `index_status`, `search_episodes`, `get_chunk`, `ask`, `get_transcript`, `save_finding`, `export_findings` | $0 | One implementation shared by the web chat, CLI and eval harness (D7) |

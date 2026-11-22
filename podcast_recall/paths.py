@@ -17,6 +17,9 @@ DEFAULT_REFRESH_DAYS = 30
 DEFAULT_WHISPER_MODEL = "mlx-community/whisper-small-mlx"
 DEFAULT_FALLBACK_MODEL = "mlx-community/whisper-large-v3-turbo"
 DEFAULT_EMBED_MODEL = "nomic-embed-text"
+DEFAULT_ANSWER_MODEL = "qwen2.5:7b-instruct"
+DEFAULT_ANSWER_TIMEOUT_S = 120.0
+DEFAULT_PASSAGES = 8
 DEFAULT_CHUNK_SECONDS = 120.0  # D17: the middle of the 100 to 150 s plateau found on 2026-11-18
 DEFAULT_CHUNK_OVERLAP_SECONDS = 24.0  # for the default length; scales with a changed length
 OVERLAP_FRACTION = 0.2
@@ -100,6 +103,25 @@ def chunk_overlap_seconds() -> float:
     if not 0 <= value <= chunk_seconds() / 2:
         raise ConfigError("PODCAST_RECALL_CHUNK_OVERLAP_SECONDS must be between 0 and half the chunk length.")
     return value
+
+
+def answer_model() -> str:
+    return os.environ.get("PODCAST_RECALL_ANSWER_MODEL") or DEFAULT_ANSWER_MODEL
+
+
+def answer_timeout_s() -> float:
+    value = _number_setting("PODCAST_RECALL_ANSWER_TIMEOUT_S", DEFAULT_ANSWER_TIMEOUT_S)
+    if not 5 <= value <= 900:
+        raise ConfigError("PODCAST_RECALL_ANSWER_TIMEOUT_S must be between 5 and 900.")
+    return value
+
+
+def passages() -> int:
+    """How many passages (chunks) are shown to the answering model."""
+    value = _number_setting("PODCAST_RECALL_PASSAGES", float(DEFAULT_PASSAGES))
+    if value != int(value) or not 1 <= value <= 20:
+        raise ConfigError("PODCAST_RECALL_PASSAGES must be a whole number from 1 to 20.")
+    return int(value)
 
 
 def intro_weight() -> float:

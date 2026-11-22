@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="recall-token" content="__RECALL_TOKEN__">
+<title>Podcast Recall</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1b1b1b; }
+  h1 { font-size: 1.4rem; margin-bottom: .2rem; }
+  .sub { color: #666; margin-top: 0; }
+  form { display: grid; gap: .5rem; margin: 1rem 0; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; }
+  input[type=text], input[type=date] { padding: .5rem; font: inherit; }
+  #q { flex: 1 1 100%; }
+  button { padding: .5rem 1rem; font: inherit; cursor: pointer; }
+  #status { color: #555; min-height: 1.5rem; }
+  .claim { margin: 1rem 0; }
+  .claim p { margin: .2rem 0 .4rem; font-weight: 600; }
+  .card { border: 1px solid #ddd; border-radius: 8px; padding: .6rem .8rem; margin: .4rem 0; background: #fafafa; }
+  .card blockquote { margin: 0 0 .3rem; font-style: italic; }
+  .meta { color: #555; font-size: .9rem; }
+  .note { background: #fff6e0; border: 1px solid #f0d58a; padding: .5rem .8rem; border-radius: 8px; margin: .6rem 0; }
+  .error { background: #fde8e8; border: 1px solid #f2b1b1; padding: .5rem .8rem; border-radius: 8px; }
+  .actions { display: flex; gap: .5rem; margin-top: 1rem; align-items: center; }
+  .small { color: #666; font-size: .85rem; }
+</style>
+</head>
+<body>
+<h1>Podcast Recall</h1>
+<p class="sub">Ask a question about the podcasts in your library. Every quote is checked against the transcript.</p>
+<form id="f">
+  <input id="q" type="text" maxlength="1000" placeholder="What would you like to know?" autocomplete="off" autofocus required>
+  <div class="row">
+    <input id="show" type="text" maxlength="200" placeholder="Show (optional)">
+    <label class="small">From <input id="since" type="date"></label>
+    <label class="small">To <input id="until" type="date"></label>
+    <button id="go" type="submit">Ask</button>
+  </div>
+</form>
+<div id="status" role="status"></div>
+<div id="out"></div>
+<script>
+"use strict";
+const token = document.querySelector('meta[name="recall-token"]').content;
+const out = document.getElementById("out");
+const statusEl = document.getElementById("status");
+let lastRequestId = null;
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;   // textContent only: transcript text is untrusted
+  return e;
+}
+function safeLink(url) {
+  // only links of the exact shape we build on the server are made clickable
+  return /^https:\/\/youtu\.be\/[A-Za-z0-9_-]{11}\?t=\d+$/.test(url) ? url : null;
+}
+async function api(path, options) {
+  const r = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json", "X-Recall-Token": token } }, options));
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || ("Request failed (" + r.status + ")"));
+  return data;
+}
+function renderAnswer(data) {
+  out.replaceChildren();
+  lastRequestId = data.request_id;
+  const answer = data.answer;
+  if (answer.status === "not_found") {
+    out.appendChild(el("div", "note", answer.summary || "I couldn't find that in your podcasts."));
+  } else {
+    if (answer.status === "premise_corrected") {
+      const n = el("div", "note", "The question assumes something the podcasts do not say.");
+      if (answer.summary) n.appendChild(el("div", "small", answer.summary + (data.note_not_quoted ? " (not quoted)" : "")));
+      out.appendChild(n);
+    }
+    answer.claims.forEach((claim) => {
+      const box = el("div", "claim");
+      box.appendChild(el("p", null, claim.text));
+      claim.citations.forEach((c) => {
+        const card = el("div", "card");
+        card.appendChild(el("blockquote", null, "“" + c.quote + "”"));
+        const meta = el("div", "meta", c.show + ": " + c.title + ", at " + c.time + " ");
+        const href = safeLink(c.url);
+        if (href) {
+          const a = el("a", null, "Open at this moment");
+          a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer";
+          meta.appendChild(a);
+        }
+        card.appendChild(meta);
+        box.appendChild(card);
+      });
+      out.appendChild(box);
+    });
+  }
+  if (data.dropped) {
+    out.appendChild(el("div", "note", data.dropped + (data.dropped === 1 ? " statement was" : " statements were") + " removed because its quote could not be verified."));
+  }
+  data.warnings.forEach((w) => out.appendChild(el("div", "small", "Warning: " + w)));
+  if (data.request_id !== null) {
+    const bar = el("div", "actions");
+    const up = el("button", null, "👍"), down = el("button", null, "👎"), save = el("button", null, "Save finding");
+    const msg = el("span", "small", "");
+    const send = async (path, body, done) => { try { await api(path, { method: "POST", body: JSON.stringify(body) }); msg.textContent = done; } catch (e) { msg.textContent = e.message; } };
+    up.onclick = () => send("/api/feedback", { request_id: data.request_id, thumbs: 1 }, "Thanks.");
+    down.onclick = () => send("/api/feedback", { request_id: data.request_id, thumbs: -1 }, "Thanks, noted.");
+    save.onclick = () => send("/api/findings", { request_id: data.request_id }, "Saved.");
+    save.disabled = answer.status === "not_found";
+    bar.append(up, down, save, msg);
+    out.appendChild(bar);
+  }
+  out.appendChild(el("div", "small", "Answered in " + (data.latency_ms / 1000).toFixed(1) + " s by " + data.model));
+}
+document.getElementById("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = { question: document.getElementById("q").value.trim() };
+  const show = document.getElementById("show").value.trim();
+  const since = document.getElementById("since").value, until = document.getElementById("until").value;
+  if (show) body.show = show;
+  if (since) body.since = since;
+  if (until) body.until = until;
+  if (!body.question) return;
+  const go = document.getElementById("go");
+  go.disabled = true; out.replaceChildren(); statusEl.textContent = "Searching your podcasts and writing an answer. This can take up to a minute.";
+  try {
+    renderAnswer(await api("/api/ask", { method: "POST", body: JSON.stringify(body) }));
+    statusEl.textContent = "";
+  } catch (err) {
+    statusEl.textContent = "";
+    out.appendChild(el("div", "error", err.message));
+  } finally { go.disabled = false; }
+});
+</script>
+</body>
+</html>

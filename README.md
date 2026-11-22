@@ -32,6 +32,9 @@ Settings come only from environment variables.
 | `PODCAST_RECALL_CHUNK_SECONDS` | `120` | Target length of a search chunk (15 to 300). Changing it makes the next `index build` redo every episode. Used for tuning. |
 | `PODCAST_RECALL_CHUNK_OVERLAP_SECONDS` | 20% of the chunk length (`24`) | How far each chunk reaches back into the one before (0 to half the chunk length). |
 | `PODCAST_RECALL_INTRO_WEIGHT` | `1` (no change) | Multiplies the search score of chunks from an episode's first 3 minutes (the teaser and host summary), which can crowd out the real answer. 0.5 helped on the dev questions but was not confirmed on the held-out ones, so it is off by default. |
+| `PODCAST_RECALL_ANSWER_MODEL` | `qwen2.5:7b-instruct` | Ollama model that writes answers. Pull it once with `ollama pull qwen2.5:7b-instruct`. |
+| `PODCAST_RECALL_ANSWER_TIMEOUT_S` | `120` | How long to wait for the model before retrying once and then giving up with a plain message. |
+| `PODCAST_RECALL_PASSAGES` | `8` | How many search results (passages) the model is shown for each question. |
 
 ## Commands
 
@@ -118,6 +121,24 @@ The golden set is `data/golden/golden_v0.csv` and the evaluation library `data/g
 in `podcast_recall/answers.py`. `eval run` checks the deterministic rubric rules only (R1 the quote is real,
 R2 the source is in the library, R5 abstention, R7 timestamp). The model-judged rules (R3, R4, R6) come later,
 and the scorecard says so. Exit code 2 means some answers failed.
+
+### Asking questions (Week 3)
+
+```
+uv run podcast-recall ask "What do the guests say about hiring?"   # cited answer in the terminal
+uv run podcast-recall ask "..." --show lenny --since 2026-01-01    # limit by show or date
+uv run podcast-recall ask "..." --json                             # the same response the web chat gets
+uv run podcast-recall ask "..." --no-record                        # do not store the question
+uv run podcast-recall serve                                        # local web chat (prints the address)
+uv run podcast-recall eval answer --split dev                      # answer the golden questions, print a scorecard
+```
+
+Every answer is checked before you see it: the model only points at numbered passages, the code copies
+the quote and time from the transcript, and a verifier re-runs rules R1 and R2 and removes anything that
+fails. If nothing survives you get "I couldn't find that in your podcasts." The web chat listens on
+127.0.0.1 only and needs the per-run token that the page carries. Questions are stored in your private
+database (never in log files). `eval answer` also prints median latency against the 15 s target.
+Ollama must be running, with the embedding model and the answer model pulled.
 
 ## Tests
 

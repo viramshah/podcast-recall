@@ -1,0 +1,4 @@
+id,type,split,tags,status,passed,critical,rules_failed,r7,episode_recall,needs_review,reasons
+p01,single_fact,dev,,answered,1,0,,1,,0,
+p02,single_fact,dev,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (eA9Zf2-qYYM)
+p03,single_fact,dev,,answered,1,0,,0,,0,R7: the nearest cited time is 74 s from the gold time (allowed 15 s)

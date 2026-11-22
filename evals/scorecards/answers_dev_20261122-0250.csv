@@ -1,0 +1,4 @@
+id,type,split,tags,status,passed,critical,rules_failed,r7,episode_recall,needs_review,reasons
+p01,single_fact,dev,,answered,1,0,,1,,0,
+p02,single_fact,dev,,answered,1,0,,0,,0,R7: the nearest cited time is 44 s from the gold time (allowed 15 s)
+p03,single_fact,dev,,answered,1,0,,0,,0,R7: the nearest cited time is 53 s from the gold time (allowed 15 s)

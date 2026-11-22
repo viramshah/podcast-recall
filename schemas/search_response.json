@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "SearchHitModel": {
+      "properties": {
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "integer"
+        },
+        "end_s": {
+          "title": "End S",
+          "type": "number"
+        },
+        "episode_id": {
+          "title": "Episode Id",
+          "type": "integer"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "show": {
+          "title": "Show",
+          "type": "string"
+        },
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "time": {
+          "title": "Time",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Url"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "episode_id",
+        "show",
+        "title",
+        "start_s",
+        "end_s",
+        "time",
+        "text",
+        "url",
+        "score"
+      ],
+      "title": "SearchHitModel",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "hits": {
+      "items": {
+        "$ref": "#/$defs/SearchHitModel"
+      },
+      "title": "Hits",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "hits",
+    "warnings"
+  ],
+  "title": "SearchResponse",
+  "type": "object"
+}

@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "SegmentModel": {
+      "properties": {
+        "start_s": {
+          "title": "Start S",
+          "type": "number"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "time": {
+          "title": "Time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_s",
+        "time",
+        "text"
+      ],
+      "title": "SegmentModel",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "at_s": {
+      "title": "At S",
+      "type": "number"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "integer"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/SegmentModel"
+      },
+      "title": "Segments",
+      "type": "array"
+    },
+    "window_s": {
+      "title": "Window S",
+      "type": "number"
+    }
+  },
+  "required": [
+    "episode_id",
+    "at_s",
+    "window_s",
+    "segments"
+  ],
+  "title": "TranscriptWindowResponse",
+  "type": "object"
+}

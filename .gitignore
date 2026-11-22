@@ -12,3 +12,6 @@ data/transcripts/
 data/clips/
 data/*.txt
 data/compare/
+
+# answers files hold transcript quotes; keep them local
+evals/scorecards/*.answers.json*
