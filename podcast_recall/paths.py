@@ -18,6 +18,7 @@ DEFAULT_WHISPER_MODEL = "mlx-community/whisper-small-mlx"
 DEFAULT_FALLBACK_MODEL = "mlx-community/whisper-large-v3-turbo"
 DEFAULT_EMBED_MODEL = "nomic-embed-text"
 DEFAULT_ANSWER_MODEL = "qwen2.5:7b-instruct"
+DEFAULT_JUDGE_MODEL = "llama3.1:8b"  # a different family from the answer model (Week 2 decision)
 DEFAULT_ANSWER_TIMEOUT_S = 120.0
 DEFAULT_PASSAGES = 8
 DEFAULT_CHUNK_SECONDS = 120.0  # D17: the middle of the 100 to 150 s plateau found on 2026-11-18
@@ -107,6 +108,28 @@ def chunk_overlap_seconds() -> float:
 
 def answer_model() -> str:
     return os.environ.get("PODCAST_RECALL_ANSWER_MODEL") or DEFAULT_ANSWER_MODEL
+
+
+def judge_model() -> str:
+    return os.environ.get("PODCAST_RECALL_JUDGE_MODEL") or DEFAULT_JUDGE_MODEL
+
+
+def unit_top() -> int:
+    """Show the model only this many best-matching units (plus neighbours); 0 shows every unit."""
+    value = _number_setting("PODCAST_RECALL_UNIT_TOP", 0.0)
+    if value != int(value) or not 0 <= value <= 200:
+        raise ConfigError("PODCAST_RECALL_UNIT_TOP must be a whole number from 0 to 200.")
+    return int(value)
+
+
+def premise_step_enabled() -> bool:
+    """Whether a `not_found` answer to a question about what someone says gets a premise check (E9)."""
+    return os.environ.get("PODCAST_RECALL_PREMISE_STEP", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def answer_check_enabled() -> bool:
+    """Whether a second model checks every answer before it is shown (Week 4, experiment E4)."""
+    return os.environ.get("PODCAST_RECALL_ANSWER_CHECK", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def answer_timeout_s() -> float:

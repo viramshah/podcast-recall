@@ -12,6 +12,7 @@ from datetime import datetime
 
 from podcast_recall import (
     agreement,
+    answering,
     answers,
     core,
     evalrun,
@@ -557,12 +558,22 @@ def cmd_eval_answer(args) -> int:
     def progress(position: int, total: int, item_id: str, status: str, seconds: float) -> None:
         _err(f"[{position}/{total}] {item_id}: {status} ({seconds:.1f} s)")
 
-    count = sum(1 for i in items if args.split == "all" or i.split == args.split)
-    if args.limit is not None:
-        count = min(count, args.limit)
+    ids = [x.strip() for x in args.ids.split(",") if x.strip()] if args.ids else None
+    count = len(core.choose_items(items, args.split, args.limit, ids))
     _err(f"Answering {count} questions; each can take up to a minute. Progress appears after each one.")
+    services = None
+    if args.check or args.unit_top is not None or args.premise_step:
+        services = answering.AnswerServices(
+            check=True if args.check else None, unit_top=args.unit_top, premise=True if args.premise_step else None
+        )
+        if args.premise_step:
+            _err("Premise step on: a not-found answer to a question about what someone says gets a false-premise check.")
+        if args.check:
+            _err(f"Answer check on: answers by {paths.answer_model()}, checked by {paths.judge_model()}.")
+        if args.unit_top:
+            _err(f"Unit selection on: the model sees the {args.unit_top} best units plus their neighbours.")
     answers_by_id, results, latencies, grades = core.answer_golden(
-        items, library, split=args.split, limit=args.limit, on_progress=progress
+        items, library, split=args.split, limit=args.limit, ids=ids, services=services, on_progress=progress
     )
     print(evalrun.format_answering(evalrun.summarize_answering(results, latencies)))
     print()
@@ -573,8 +584,134 @@ def cmd_eval_answer(args) -> int:
     answers_path = card.rsplit(".", 1)[0] + ".answers.jsonl"
     with open(answers_path, "w", encoding="utf-8") as handle:
         handle.writelines(json.dumps(raw, ensure_ascii=False) + "\n" for item_id, raw in answers_by_id.items())
-    print(f"\nWrote {card} and {answers_path}")
+    chosen = core.choose_items(items, args.split, args.limit, ids)
+    trace_path = card.rsplit(".", 1)[0] + ".trace.jsonl"
+    with open(trace_path, "w", encoding="utf-8") as handle:
+        handle.writelines(json.dumps(core.trace_record(item.id, result), ensure_ascii=False) + "\n" for item, result in zip(chosen, results, strict=True))
+    print(f"\nWrote {card}, {answers_path} and {trace_path}")
     return EXIT_PARTIAL if any(not g.passed for g in grades) else EXIT_OK
+
+
+def cmd_eval_diagnose(args) -> int:
+    import json
+
+    from podcast_recall import diagnosis
+
+    items, library = _golden_and_library(args)
+    answers_by_id = answers.load_answers(args.answers)
+    trace_path = args.trace or args.answers.replace(".answers.jsonl", ".trace.jsonl")
+    traces: dict[str, dict] = {}
+    try:
+        with open(trace_path, encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    record = json.loads(line)
+                    traces[record["id"]] = record
+    except FileNotFoundError:
+        _err(f"No trace file at {trace_path}; causes that need the shown passages cannot be told.")
+    grades, found = core.diagnose_run(items, library, answers_by_id, traces)
+    print(diagnosis.format_diagnosis(found, len(grades)))
+    if args.out:
+        import csv
+
+        with open(args.out, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["id", "type", "status", "cause", "detail"])
+            writer.writerows([d.item_id, d.type, d.status, d.cause, d.detail] for d in found)
+        print(f"\nWrote {args.out}")
+    return EXIT_OK
+
+
+def cmd_eval_abstain(args) -> int:
+    from podcast_recall import abstention
+
+    items, library = _golden_and_library(args)
+    rows = core.abstention_scan(items, library, split=args.split, passages=args.passages)
+    print(abstention.format_scan(rows))
+    if args.out:
+        import csv
+
+        with open(args.out, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["id", "type", "best_distance", "hits"])
+            writer.writerows([r.item_id, r.type, "" if r.best_distance is None else f"{r.best_distance:.4f}", r.hits] for r in rows)
+        print(f"\nWrote {args.out}")
+    return EXIT_OK
+
+
+def cmd_eval_judge_sheet(args) -> int:
+    from podcast_recall import judge_calibration as jc
+
+    items, _library = _golden_and_library(args)
+    rows = jc.collect_claims(args.answers, items)
+    chosen = jc.sample(rows, args.count)
+    jc.write_sheet(args.out, chosen)
+    print(f"{len(rows)} claims in {len(args.answers)} run(s); {len(chosen)} written to {args.out}.")
+    print("Fill in the two last columns for each row with yes, partly or no:")
+    print("  human_supported: does the quote clearly say what the claim says?")
+    print("  human_answers_question: does the claim directly answer what the question asks?")
+    return EXIT_OK
+
+
+def cmd_eval_grade_sheet(args) -> int:
+    from podcast_recall import handgrade
+    from podcast_recall import judge_calibration as jc
+    from podcast_recall.answers import load_answers, parse_answer
+
+    items, _library = _golden_and_library(args)
+    rows = jc.collect_claims([args.answers], items)
+    places: dict[str, tuple[str, str]] = {}
+    source = jc.source_name(args.answers)
+    for item_id, raw in load_answers(args.answers).items():
+        for number, claim in enumerate(parse_answer(raw).claims, 1):
+            if claim.citations:
+                places[f"{source}:{item_id}#{number}"] = (claim.citations[0].show, claim.citations[0].title)
+    rows = sorted(rows, key=lambda r: jc._key(r.claim_id))
+    handgrade.write_sheet(args.out, rows, places)
+    print(f"{len(rows)} claims from {len({r.question_id for r in rows})} answers written to {args.out}.")
+    return EXIT_OK
+
+
+def cmd_eval_grade_score(args) -> int:
+    from podcast_recall import handgrade
+    from podcast_recall import judge_calibration as jc
+
+    items, _library = _golden_and_library(args)
+    grades = handgrade.read_grades(args.sheet)
+    result = handgrade.score(jc.collect_claims([args.answers], items), grades)
+    print(f"Claims graded: {result.claims}; answers fully graded: {result.answers}"
+          + (f" ({result.incomplete} more answers have ungraded claims and are left out)" if result.incomplete else ""))
+    if result.answers:
+        print(f"Answers passing R3 and R4: {result.passed}/{result.answers} = {result.passed / result.answers:.0%}")
+        print(f"Answers with a Critical failure (R3 no or R4 no): {result.critical}/{result.answers} = {result.critical / result.answers:.0%}")
+        print(f"Answers with a Major failure only (R3 partly, or a claim that does not answer): {result.major}")
+    if result.claims:
+        print(f"Claims: R3 yes {result.r3_yes}/{result.claims}, R4 yes {result.r4_yes}/{result.claims}, answers the question yes {result.answers_yes}/{result.claims}")
+    return EXIT_OK
+
+
+def cmd_eval_judge_agreement(args) -> int:
+    from podcast_recall import judge_calibration as jc
+    from podcast_recall import llm
+
+    items, _library = _golden_and_library(args)
+    human = jc.read_labels(args.sheet)
+    rows = jc.collect_claims(args.answers, items)
+    chat = llm.OllamaChat(model=paths.judge_model())
+    _err(f"Asking {paths.judge_model()} about {len(human)} labelled claims.")
+    machine = jc.run_judge(chat, rows, set(human))
+    print(jc.format_report(jc.compare(human, machine)))
+    if args.out:
+        import csv
+
+        with open(args.out, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["claim_id", "human_supported", "human_answers", "judge_supported", "judge_answers"])
+            for claim_id, (hs, ha) in sorted(human.items()):
+                ms, ma = machine.get(claim_id, ("", ""))
+                writer.writerow([claim_id, hs, ha, ms, ma])
+        print(f"\nWrote {args.out}")
+    return EXIT_OK
 
 
 def cmd_eval_retrieval(args) -> int:
@@ -670,11 +807,11 @@ def format_answer(response: schemas.AskResponse) -> str:
             if answer.summary:
                 lines.append(f"  {answer.summary}" + ("  (not quoted)" if response.note_not_quoted else ""))
         for number, claim in enumerate(answer.claims, 1):
-            lines.append(f"{number}. {claim.text}")
             for cite in claim.citations:
-                lines.append(f'   "{cite.quote}"')
+                lines.append(f'{number}. "{cite.quote}"')
                 lines.append(f"   {cite.show}: {cite.title}, at {cite.time}")
                 lines.append(f"   {cite.url}")
+            lines.append(f"   AI summary (may say more than the quote): {claim.text}")
     if response.dropped:
         word = "statement was" if response.dropped == 1 else "statements were"
         lines.append(f"({response.dropped} {word} removed because its quote could not be verified.)")
@@ -861,7 +998,37 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--split", choices=("all", "dev", "heldout"), default="dev",
                    help="which questions (default dev; the held-out split is never used for tuning)")
     p.add_argument("--limit", type=int, default=None, help="only the first N questions (a quick trial)")
+    p.add_argument("--ids", metavar="ID,ID,...", help="only these question ids (for re-testing a few failures)")
+    p.add_argument("--unit-top", type=int, default=None, metavar="N",
+                   help="show the model only the N best-matching units plus neighbours (E5; 0 = all)")
+    p.add_argument("--premise-step", action="store_true",
+                   help="E9: re-check not-found answers to questions about what someone says for a false premise")
+    p.add_argument("--check", action="store_true",
+                   help="run the second-model answer check (PODCAST_RECALL_JUDGE_MODEL) before grading")
     p.add_argument("--out", metavar="FILE", help="where to write the scorecard CSV")
+    p = eadd("diagnose", cmd_eval_diagnose, "Explain why each failing golden question failed (from a saved answers run).")
+    p.add_argument("--answers", required=True, metavar="FILE", help="the .answers.jsonl written by `eval answer`")
+    p.add_argument("--trace", metavar="FILE", help="the .trace.jsonl (default: next to the answers file)")
+    p.add_argument("--out", metavar="FILE", help="where to write the per-question causes as CSV")
+    p = eadd("abstain", cmd_eval_abstain, "Can search distance alone separate answerable from unanswerable questions? (no model)")
+    p.add_argument("--split", choices=("all", "dev", "heldout"), default="dev",
+                   help="which questions (default dev; pick the threshold on dev only)")
+    p.add_argument("--passages", type=int, default=None, help="how many results to search (default: the answer setting)")
+    p.add_argument("--out", metavar="FILE", help="where to write the per-question distances as CSV")
+    p = eadd("judge-sheet", cmd_eval_judge_sheet, "Write a sheet of claims for a person to label (to calibrate the judge model).")
+    p.add_argument("--answers", action="append", required=True, metavar="FILE", help="an .answers.jsonl from `eval answer` (repeat for several runs)")
+    p.add_argument("--count", type=int, default=60, help="how many claims to put on the sheet (default 60)")
+    p.add_argument("--out", default="evals/judge_sheet.csv", help="where to write the sheet")
+    p = eadd("grade-sheet", cmd_eval_grade_sheet, "Write a sheet of every claim in a run for a person to grade on R3 and R4.")
+    p.add_argument("--answers", required=True, metavar="FILE", help="the .answers.jsonl from `eval answer`")
+    p.add_argument("--out", required=True, metavar="FILE", help="where to write the sheet")
+    p = eadd("grade-score", cmd_eval_grade_score, "Score a graded R3/R4 sheet.")
+    p.add_argument("--answers", required=True, metavar="FILE", help="the same .answers.jsonl")
+    p.add_argument("--sheet", required=True, metavar="FILE", help="the sheet with the grades filled in")
+    p = eadd("judge-agreement", cmd_eval_judge_agreement, "Compare the judge model with a person's labels on the sheet.")
+    p.add_argument("--sheet", required=True, metavar="FILE", help="the sheet with the human labels filled in")
+    p.add_argument("--answers", action="append", required=True, metavar="FILE", help="the same .answers.jsonl files used for the sheet")
+    p.add_argument("--out", metavar="FILE", help="where to write each claim's human and judge labels as CSV")
     p = eadd("retrieval", cmd_eval_retrieval, "Measure recall@5 on the golden questions.")
     p.add_argument("--split", choices=("all", "dev", "heldout"), default="all")
     p.add_argument("--no-vectors", action="store_true", help="keyword search only")

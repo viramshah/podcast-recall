@@ -801,7 +801,8 @@ class Commands(Base):
         with patch:
             code, out, _err = self.run_cli("ask", "What does a good pipeline have?")
         self.assertEqual(code, 0)
-        self.assertIn("1. The speaker explains it.", out)
+        self.assertIn("AI summary (may say more than the quote): The speaker explains it.", out)
+        self.assertLess(out.index("1. \""), out.index("AI summary"))   # quote first, summary second
         self.assertIn("staging", out)
         self.assertRegex(out, r"Lenny's Podcast: Shipping with Kubernetes, at \d+:\d\d")
         self.assertRegex(out, r"https://youtu\.be/[A-Za-z0-9_-]{11}\?t=\d+")

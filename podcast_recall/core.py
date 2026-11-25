@@ -7,7 +7,7 @@ fakes; when they are omitted the real database, Keychain and YouTube client are 
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import contextmanager, nullcontext
 
 from podcast_recall import (
@@ -698,21 +698,34 @@ def list_findings(user_id: str = OWNER, *, conn=None):
         return requests_store.list_findings(db, user_id)
 
 
+def choose_items(items, split: str = "dev", limit: int | None = None, ids: Sequence[str] | None = None):
+    """The golden questions a run covers: a split, optionally only some ids, optionally the first N."""
+    chosen = [i for i in items if split == "all" or i.split == split]
+    if ids:
+        unknown = sorted(set(ids) - {i.id for i in items})
+        if unknown:
+            raise ConfigError("Unknown question id(s): " + ", ".join(unknown))
+        wanted = set(ids)
+        chosen = [i for i in items if i.id in wanted]  # an explicit id wins over the split
+    if limit is not None:
+        chosen = chosen[:limit]
+    return chosen
+
+
 def answer_golden(
     items,
     library_video_ids,
     *,
     split: str = "dev",
     limit: int | None = None,
+    ids: Sequence[str] | None = None,
     services: answering.AnswerServices | None = None,
     on_progress=None,
     conn=None,
 ):
     """Ask the real answering system every golden question of a split, against the evaluation
     library. Nothing is stored in the request history. Returns (answers, results, latencies, grades)."""
-    chosen = [i for i in items if split == "all" or i.split == split]
-    if limit is not None:
-        chosen = chosen[:limit]
+    chosen = choose_items(items, split, limit, ids)
     services = services or answering.AnswerServices()
     answers_by_id: dict[str, dict] = {}
     results = []
@@ -732,3 +745,60 @@ def answer_golden(
                 on_progress(position, len(chosen), item.id, result.answer.status, result.latency_ms / 1000)
         grades = evalrun.grade_all(chosen, answers_by_id, ctx, "all")
     return answers_by_id, results, latencies, grades
+
+
+def trace_record(item_id: str, result) -> dict:
+    """What one answered question leaves behind for diagnosis: the passages the model was shown,
+    its raw reply and what the verifier removed. Private (it holds transcript text): git-ignored."""
+    return {
+        "id": item_id,
+        "status": result.answer.status,
+        "latency_ms": result.latency_ms,
+        "model": result.model,
+        "chunk_ids": list(result.chunk_ids),
+        "raw_reply": result.raw_reply,
+        "dropped": [{"claim": d.claim, "reason": d.reason} for d in result.dropped],
+        "warnings": list(result.warnings),
+        "prompt_tokens": result.prompt_tokens,
+        "completion_tokens": result.completion_tokens,
+        "units_total": result.units_total,
+        "units_shown": result.units_shown,
+        "premise_raw": result.premise_raw,
+        "premise_ms": result.premise_ms,
+        "check_model": result.check_model,
+        "check_ms": result.check_ms,
+        "check_raw": result.check_raw,
+    }
+
+
+def diagnose_run(items, library_video_ids, answers_by_id: dict, traces: dict, conn=None):
+    """Grade the saved answers again and explain every failure. Returns (grades, diagnoses)."""
+    from podcast_recall import diagnosis
+
+    graded_items = [i for i in items if i.id in answers_by_id]
+    with _Db(conn) as db:
+        ctx = evalrun.build_context(db, library_video_ids)
+        grades = evalrun.grade_all(graded_items, answers_by_id, ctx, "all")
+        return grades, diagnosis.diagnose(db, graded_items, grades, traces, ctx)
+
+
+def abstention_scan(items, library_video_ids, *, split: str = "dev", per_episode: int = 3, passages: int | None = None,
+                    services: indexer.IndexServices | None = None, conn=None):
+    """Search each golden question the way the answering path does; return the best meaning
+    distance and the hit count per question. No answering model is used."""
+    from podcast_recall import abstention
+
+    chosen = choose_items(items, split)
+    services = services or indexer.IndexServices()
+    count = passages or paths.passages()
+    best: dict[str, tuple[float | None, int]] = {}
+    with _Db(conn) as db:
+        embedder = services.get_embedder()
+        for item in chosen:
+            hits = retrieval.find(
+                db, embedder, item.question, OWNER, video_ids=library_video_ids, limit=count,
+                per_episode=per_episode, use_vectors=services.use_vectors,
+            ).hits
+            distances = [h.vector_distance for h in hits if h.vector_distance is not None]
+            best[item.id] = (min(distances) if distances else None, len(hits))
+    return abstention.scan_rows(chosen, best)

@@ -15,3 +15,7 @@ data/compare/
 
 # answers files hold transcript quotes; keep them local
 evals/scorecards/*.answers.json*
+evals/scorecards/*.trace.json*
+evals/judge_sheet*.csv
+evals/judge_agreement*.csv
+evals/grade_sheet*.csv

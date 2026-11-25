@@ -16,9 +16,10 @@
   button { padding: .5rem 1rem; font: inherit; cursor: pointer; }
   #status { color: #555; min-height: 1.5rem; }
   .claim { margin: 1rem 0; }
-  .claim p { margin: .2rem 0 .4rem; font-weight: 600; }
+  .claim p.summary { margin: .2rem 0 .4rem; color: #444; font-size: .92rem; }
+  .claim .tag { font-weight: 600; color: #666; }
   .card { border: 1px solid #ddd; border-radius: 8px; padding: .6rem .8rem; margin: .4rem 0; background: #fafafa; }
-  .card blockquote { margin: 0 0 .3rem; font-style: italic; }
+  .card blockquote { margin: 0 0 .3rem; font-style: italic; font-size: 1.05rem; }
   .meta { color: #555; font-size: .9rem; }
   .note { background: #fff6e0; border: 1px solid #f0d58a; padding: .5rem .8rem; border-radius: 8px; margin: .6rem 0; }
   .error { background: #fde8e8; border: 1px solid #f2b1b1; padding: .5rem .8rem; border-radius: 8px; }
@@ -77,7 +78,6 @@ function renderAnswer(data) {
     }
     answer.claims.forEach((claim) => {
       const box = el("div", "claim");
-      box.appendChild(el("p", null, claim.text));
       claim.citations.forEach((c) => {
         const card = el("div", "card");
         card.appendChild(el("blockquote", null, "“" + c.quote + "”"));
@@ -91,6 +91,10 @@ function renderAnswer(data) {
         card.appendChild(meta);
         box.appendChild(card);
       });
+      const summary = el("p", "summary");
+      summary.appendChild(el("span", "tag", "AI summary (may say more than the quote): "));
+      summary.appendChild(document.createTextNode(claim.text));   // text node only: untrusted
+      box.appendChild(summary);
       out.appendChild(box);
     });
   }

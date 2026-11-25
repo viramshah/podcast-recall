@@ -35,6 +35,10 @@ Settings come only from environment variables.
 | `PODCAST_RECALL_ANSWER_MODEL` | `qwen2.5:7b-instruct` | Ollama model that writes answers. Pull it once with `ollama pull qwen2.5:7b-instruct`. |
 | `PODCAST_RECALL_ANSWER_TIMEOUT_S` | `120` | How long to wait for the model before retrying once and then giving up with a plain message. |
 | `PODCAST_RECALL_PASSAGES` | `8` | How many search results (passages) the model is shown for each question. |
+| `PODCAST_RECALL_UNIT_TOP` | `0` (off) | Experiment: show the answering model only this many best-matching units (plus their neighbours) from the retrieved passages instead of every unit. Smaller prompt, faster, easier to point at the right unit. Needs the embedding model at question time. |
+| `PODCAST_RECALL_PREMISE_STEP` | off | Experiment: when the answer is "not found" and the question is about what someone says ("Why does X say ...?"), one more model call checks whether the passages contradict what the question assumes and, if so, answers with a correction. Only runs after a "not found". |
+| `PODCAST_RECALL_ANSWER_CHECK` | off | Set to `1` to have a second model check every answer before it is shown: each claim must be clearly supported by its quote and must answer the question, otherwise it is dropped (and the answer becomes "not found" if none is left). Adds one model call per answer. |
+| `PODCAST_RECALL_JUDGE_MODEL` | `llama3.1:8b` | The model that does that check (a different family from the answer model). Pull it with `ollama pull llama3.1:8b`. |
 
 ## Commands
 
@@ -131,13 +135,20 @@ uv run podcast-recall ask "..." --json                             # the same re
 uv run podcast-recall ask "..." --no-record                        # do not store the question
 uv run podcast-recall serve                                        # local web chat (prints the address)
 uv run podcast-recall eval answer --split dev                      # answer the golden questions, print a scorecard
+uv run podcast-recall eval answer --split dev --ids p01,sf09 --check --unit-top 12 --premise-step   # a few questions, with the answer check and unit selection
+uv run podcast-recall eval judge-sheet --answers RUN.answers.jsonl --count 60   # claims for a person to label
+uv run podcast-recall eval judge-agreement --sheet evals/judge_sheet.csv --answers RUN.answers.jsonl   # judge vs the person's labels
+uv run podcast-recall eval abstain --split dev                    # can search distance alone say "not found"?
+uv run podcast-recall eval diagnose --answers evals/scorecards/RUN.answers.jsonl   # why each failing question failed
 ```
 
 Every answer is checked before you see it: the model only points at numbered passages, the code copies
 the quote and time from the transcript, and a verifier re-runs rules R1 and R2 and removes anything that
 fails. If nothing survives you get "I couldn't find that in your podcasts." The web chat listens on
 127.0.0.1 only and needs the per-run token that the page carries. Questions are stored in your private
-database (never in log files). `eval answer` also prints median latency against the 15 s target.
+database (never in log files). `eval answer` also prints median latency against the 15 s target, and
+saves a private `.trace.jsonl` next to the scorecard (the passages shown, the model's raw reply, what the
+verifier removed) for `eval diagnose`; trace and answers files hold transcript text and are git-ignored.
 Ollama must be running, with the embedding model and the answer model pulled.
 
 ## Tests

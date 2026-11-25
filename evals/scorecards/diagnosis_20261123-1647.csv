@@ -1,0 +1,17 @@
+id,type,status,cause,detail
+p01,single_fact,not_found,model_refused_with_gold_passage_shown,
+p03,single_fact,not_found,model_refused_with_gold_passage_shown,
+p04,single_fact,not_found,model_refused_with_gold_passage_shown,
+sf03,single_fact,not_found,model_refused_with_gold_passage_shown,
+sf06,single_fact,not_found,gold_passage_not_shown,
+sf09,single_fact,not_found,model_refused_with_gold_passage_shown,
+n07,synthesis,not_found,model_refused_with_gold_passage_shown,
+n09,synthesis,not_found,gold_passage_not_shown,
+sy01,synthesis,not_found,model_refused_with_gold_passage_shown,
+sy07,synthesis,not_found,model_refused_with_gold_passage_shown,
+p11,who_when,not_found,model_refused_with_gold_passage_shown,
+ww01,who_when,not_found,model_refused_with_gold_passage_shown,
+ww10,who_when,not_found,gold_passage_not_shown,
+fp05,false_premise,not_found,false_premise_not_corrected,R5
+p17,false_premise,not_found,false_premise_not_corrected,R5
+p18,false_premise,not_found,false_premise_not_corrected,R5

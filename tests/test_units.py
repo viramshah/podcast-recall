@@ -287,6 +287,8 @@ class Migrations(Base):
         backups = Path(self.home) / "backups"
         conn = store.connect(db, backups)
         latest = max(v for v, _name, _sql in store._migration_files())
+        original = store._migration_files
+        self.addCleanup(setattr, store, "_migration_files", original)  # this test must not leak its patch
         for n in range(latest + 1, latest + 6):  # five more upgrades than the real ones
             extra = [(1, "001_initial.sql", ""), (n, f"{n:03d}_extra.sql", f"CREATE TABLE extra{n} (a);")]
             store._migration_files = lambda extra=extra: extra

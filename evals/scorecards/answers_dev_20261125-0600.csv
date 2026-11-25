@@ -1,0 +1,21 @@
+id,type,split,tags,status,passed,critical,rules_failed,r7,episode_recall,needs_review,reasons
+p01,single_fact,dev,,answered,1,0,,1,,0,
+p03,single_fact,dev,,answered,1,0,,0,,0,R7: the nearest cited time is 74 s from the gold time (allowed 15 s)
+sf03,single_fact,dev,raj,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (8ol3j7o1U7o)
+sf06,single_fact,dev,raj,answered,1,0,,0,,0,R7: the nearest cited time is 69 s from the gold time (allowed 15 s)
+sf09,single_fact,dev,,answered,1,0,,1,,0,
+sf14,single_fact,dev,,answered,1,0,,0,,0,R7: the nearest cited time is 219 s from the gold time (allowed 15 s)
+n06,synthesis,dev,raj,answered,1,0,,,0.50,0,
+n07,synthesis,dev,,answered,1,0,,,1.00,0,
+p07,synthesis,dev,,answered,1,0,,,0.50,0,
+p08,synthesis,dev,,answered,1,0,,,0.50,0,
+sy07,synthesis,dev,,answered,1,0,,,0.50,0,
+sy13,synthesis,dev,,answered,1,0,,,1.00,0,
+ww01,who_when,dev,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (19qrLchbQEc)
+ww07,who_when,dev,,answered,1,0,,1,,0,
+n14,unanswerable,dev,raj,not_found,1,0,,,,0,
+n15,unanswerable,dev,,not_found,1,0,,,,0,
+p14,unanswerable,dev,,not_found,1,0,,,,0,
+un01,unanswerable,dev,,not_found,1,0,,,,0,
+nl01,not_in_library,dev,raj,not_found,1,0,,,,0,
+p20,not_in_library,dev,,not_found,1,0,,,,0,

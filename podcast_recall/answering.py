@@ -19,14 +19,18 @@ from dataclasses import dataclass, field
 
 from podcast_recall import (
     checkers,
+    embeddings,
     evalrun,
     indexer,
+    judge,
     llm,
     paths,
+    premise,
     prompting,
     retrieval,
     transcripts,
     units,
+    unitselect,
     verifier,
 )
 from podcast_recall.answers import (
@@ -36,7 +40,7 @@ from podcast_recall.answers import (
     Claim,
     link_for,
 )
-from podcast_recall.errors import ConfigError
+from podcast_recall.errors import ApiError, ConfigError
 from podcast_recall.prompting import MAX_SOURCES, MAX_UNITS_PER_SOURCE, STATUSES, Passage
 from podcast_recall.units import Unit
 from podcast_recall.verifier import NOT_FOUND_TEXT, Dropped
@@ -51,7 +55,12 @@ MODEL_ATTEMPTS = 2
 class AnswerServices:
     index: indexer.IndexServices = field(default_factory=indexer.IndexServices)
     chat: object | None = None  # something with `chat_json(system, user, schema)`; real Ollama by default
+    check: bool | None = None  # run the second-model answer check; None means the environment setting
+    unit_top: int | None = None  # keep only this many best units (E5); None means the environment setting
+    premise: bool | None = None  # check `not_found` answers for a false premise (E9); None means the environment
+    judge: object | None = None  # the checker's model client; a real Ollama judge model by default
     _default: object | None = field(default=None, repr=False)
+    _default_judge: object | None = field(default=None, repr=False)
 
     def get_chat(self):
         if self.chat is not None:
@@ -59,6 +68,22 @@ class AnswerServices:
         if self._default is None:
             self._default = llm.OllamaChat()
         return self._default
+
+    def checking(self) -> bool:
+        return paths.answer_check_enabled() if self.check is None else self.check
+
+    def premise_step(self) -> bool:
+        return paths.premise_step_enabled() if self.premise is None else self.premise
+
+    def unit_limit(self) -> int:
+        return paths.unit_top() if self.unit_top is None else self.unit_top
+
+    def get_judge(self):
+        if self.judge is not None:
+            return self.judge
+        if self._default_judge is None:
+            self._default_judge = llm.OllamaChat(model=paths.judge_model())
+        return self._default_judge
 
 
 @dataclass
@@ -73,6 +98,14 @@ class AskResult:
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     request_id: int | None = None
+    raw_reply: dict | None = None  # the model's JSON reply as received (private; for diagnosis)
+    check_raw: dict | None = None  # the answer checker's verdicts, when the check ran
+    check_model: str = ""
+    check_ms: int = 0
+    units_total: int = 0  # units in the retrieved passages
+    units_shown: int = 0  # units the model was shown (fewer when the unit selection is on)
+    premise_raw: dict | None = None  # the premise check's reply, when that step ran
+    premise_ms: int = 0
 
 
 # ---------------------------------------------------------------------------- the quote
@@ -226,6 +259,16 @@ def answer_question(
             unit_count += len(pieces)  # unit numbers run on across passages, so each is unique
             numbered[number] = Passage(number, hit, tuple(pieces))
     result.chunk_ids = [p.hit.chunk_id for p in numbered.values()]
+    result.units_total = sum(len(p.units) for p in numbered.values())
+    result.units_shown = result.units_total
+    top = services.unit_limit()
+    if numbered and top > 0:
+        try:
+            reduced = unitselect.select_units(question, list(numbered.values()), services.index.get_embedder(), top)
+            numbered = {p.number: p for p in reduced}
+            result.units_shown = sum(len(p.units) for p in reduced)
+        except (embeddings.EmbeddingUnavailable, ApiError) as exc:
+            result.warnings.append(f"Unit selection was skipped ({exc}); the model saw every unit.")
     if not numbered:
         result.latency_ms = int((clock() - started) * 1000)
         return result
@@ -243,6 +286,7 @@ def answer_question(
     for _attempt in range(MODEL_ATTEMPTS):
         try:
             reply = chat.chat_json(prompting.SYSTEM_PROMPT, message, prompting.ANSWER_SCHEMA)
+            result.raw_reply = reply.data
             interpreted = interpret(reply.data, numbered, video_for)
             result.prompt_tokens, result.completion_tokens = reply.prompt_tokens, reply.completion_tokens
             break
@@ -259,5 +303,62 @@ def answer_question(
     result.answer = verified.answer
     result.dropped = dropped + verified.dropped
     result.uncited_note = verified.uncited_note
+    if (
+        result.answer.status == "not_found"
+        and services.premise_step()
+        and premise.looks_attributed(question)
+    ):
+        _run_premise_step(result, services, question, numbered, video_for, build_context(conn, user_id, video_ids), clock)
+    if services.checking() and result.answer.claims and result.answer.status in ("answered", "premise_corrected"):
+        _run_check(result, services, question, clock)
     result.latency_ms = int((clock() - started) * 1000)
     return result
+
+
+def _run_premise_step(result: AskResult, services: AnswerServices, question: str, numbered, video_for, ctx, clock) -> None:
+    """Ask once whether the passages contradict what the question assumes. A correction is kept only
+    if at least one of its claims has a verified citation."""
+    began = clock()
+    message = prompting.build_user_message(question, list(numbered.values()))
+    reply = None
+    for _attempt in range(MODEL_ATTEMPTS):
+        try:
+            reply = services.get_chat().chat_json(premise.PREMISE_PROMPT, message, premise.PREMISE_SCHEMA)
+            break
+        except llm.InvalidModelOutput as exc:
+            result.warnings.append(f"The premise check's reply could not be used ({exc}).")
+    result.premise_ms = int((clock() - began) * 1000)
+    if reply is None:
+        return
+    result.premise_raw = reply.data
+    try:
+        status, note, claims, dropped = interpret(reply.data, numbered, video_for)
+    except llm.InvalidModelOutput as exc:
+        result.warnings.append(f"The premise check's reply could not be used ({exc}).")
+        return
+    if status != "premise_corrected" or not claims:
+        result.dropped = result.dropped + dropped
+        return
+    verified = verifier.verify(Answer(status, tuple(claims), ""), ctx, note=note)
+    result.dropped = result.dropped + dropped + verified.dropped
+    if verified.answer.status == "premise_corrected":
+        result.answer = verified.answer
+        result.uncited_note = verified.uncited_note
+
+
+def _run_check(result: AskResult, services: AnswerServices, question: str, clock: Callable[[], float]) -> None:
+    """The second-model check: drop claims whose quote does not clearly support them or that do not
+    answer the question; if none are left the answer becomes "not found"."""
+    judge_client = services.get_judge()
+    began = clock()
+    checked = judge.check_answer(judge_client, question, result.answer.status, result.answer.claims)
+    result.check_ms = int((clock() - began) * 1000)
+    result.check_raw = checked.raw
+    result.check_model = getattr(judge_client, "model", "")
+    if checked.warning:
+        result.warnings.append(checked.warning)
+    result.dropped = result.dropped + checked.dropped
+    if checked.kept:
+        result.answer = dataclasses.replace(result.answer, claims=tuple(checked.kept))
+    elif checked.dropped:
+        result.answer = Answer("not_found", (), NOT_FOUND_TEXT)

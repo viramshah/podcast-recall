@@ -1,0 +1,21 @@
+id,type,split,tags,status,passed,critical,rules_failed,r7,episode_recall,needs_review,reasons
+p01,single_fact,dev,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (3I6QYkccd3o)
+p02,single_fact,dev,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (eA9Zf2-qYYM)
+p04,single_fact,dev,raj,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (8ol3j7o1U7o)
+sf01,single_fact,dev,raj,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (dNIef2fGLQY)
+sf06,single_fact,dev,raj,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (BgeNDG5jD60)
+sf09,single_fact,dev,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (YS9In813jJ0)
+sy01,synthesis,dev,,answered,1,0,,,0.50,0,
+p13,who_when,dev,raj,answered,1,0,,0,,0,R7: the nearest cited time is 39 s from the gold time (allowed 15 s)
+ww01,who_when,dev,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (19qrLchbQEc)
+n14,unanswerable,dev,raj,not_found,1,0,,,,0,
+n15,unanswerable,dev,,not_found,1,0,,,,0,
+p14,unanswerable,dev,,not_found,1,0,,,,0,
+p16,unanswerable,dev,raj,not_found,1,0,,,,0,
+un01,unanswerable,dev,,not_found,1,0,,,,0,
+fp05,false_premise,dev,raj,answered,0,1,R5,,,0,R5: answered a question that should get 'premise_corrected'
+p17,false_premise,dev,raj,not_found,0,0,R5,,,0,"R5: the status is not_found, expected premise_corrected"
+p18,false_premise,dev,,not_found,0,0,R5,,,0,"R5: the status is not_found, expected premise_corrected"
+nl01,not_in_library,dev,raj,not_found,1,0,,,,0,
+nl03,not_in_library,dev,,not_found,1,0,,,,0,
+p20,not_in_library,dev,,not_found,1,0,,,,0,

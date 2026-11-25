@@ -61,3 +61,7 @@ An answer is **grounded** when every factual statement in it is backed by, and c
 
 ## Version history
 - v1.0 (2026-11-18): thresholds from D5 accepted as provisional: 0.90, 15 seconds, "Partly" fails. Quote limits added (2 sentences and 60 words). Unpunctuated transcripts were the reason for the word limit.
+
+
+## Clarification (D21, 2026-11-23): speaker names
+R3 judges whether the cited quote says what the claim says, ignoring who is named. R4 judges whether the named speaker, show and episode are right, using the transcript's speaker label or episode metadata rather than the quote text. A name the quote lacks is not an R3 failure; a name nothing in the episode supports is an R4 failure. A detail the quote lacks (a cause, number or recommendation) is an R3 failure.

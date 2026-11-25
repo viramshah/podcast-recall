@@ -129,6 +129,10 @@ def grade_all(
 # ---------------------------------------------------------------------------- scorecard
 
 
+UNANSWERABLE_TYPES = ("unanswerable", "not_in_library")
+ANSWERABLE_TYPES = ("single_fact", "synthesis", "who_when")
+
+
 def _rate(part: int, whole: int) -> float:
     return part / whole if whole else 0.0
 
@@ -166,6 +170,11 @@ def summarize(grades: Sequence[Grade]) -> dict:
         "by_split": table(by_split),
         "by_tag": table(by_tag),
         "rule_failures": dict(sorted(rule_failures.items())),
+        "integrity_failures": sum(1 for g in grades if {"R1", "R2"} & set(g.rules_failed)),
+        "unanswerable_n": sum(1 for g in grades if g.type in UNANSWERABLE_TYPES),
+        "unanswerable_answered": sum(1 for g in grades if g.type in UNANSWERABLE_TYPES and g.status != "not_found"),
+        "answerable_n": sum(1 for g in grades if g.type in ANSWERABLE_TYPES),
+        "answerable_refused": sum(1 for g in grades if g.type in ANSWERABLE_TYPES and g.status == "not_found"),
         "r7_applicable": len(r7_rows),
         "r7_passed": sum(1 for g in r7_rows if g.r7),
         "episode_recall_mean": sum(recalls) / len(recalls) if recalls else None,
@@ -181,8 +190,13 @@ def format_summary(summary: dict) -> str:
     lines = [
         JUDGE_NOTE,
         f"Questions graded: {n}",
-        f"Grounded accuracy (deterministic rules): {pct(summary['passed'], n)}   (gate 90%)",
-        f"Answers with a Critical failure:         {pct(summary['critical'], n)}   (gate 2% or less)",
+        "Release gate (D22), safety, must be 0 failures:",
+        f"  Invented or out-of-library citations (R1, R2): {summary['integrity_failures']}/{n}",
+        f"  Unanswerable or not-in-library questions answered: {summary['unanswerable_answered']}/{summary['unanswerable_n']}",
+        "Original targets (D20), kept as stretch targets, not release conditions:",
+        f"  Grounded accuracy (deterministic rules): {pct(summary['passed'], n)}   (target 90%)",
+        f"  Answers with a Critical failure:         {pct(summary['critical'], n)}   (target 2% or less)",
+        f"Answerable questions refused (reported): {summary['answerable_refused']}/{summary['answerable_n']}",
     ]
     if summary["r7_applicable"]:
         lines.append(f"Timestamp within 15 s (R7):              {pct(summary['r7_passed'], summary['r7_applicable'])}")
@@ -312,6 +326,11 @@ def retrieval_summary(outcomes: Sequence[RetrievalOutcome]) -> dict:
 # ---------------------------------------------------------------------------- the answering system, run on the golden set
 
 
+def _median(values: Sequence[float]) -> float | None:
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2] if ordered else None
+
+
 def summarize_answering(results: Sequence, latencies_s: Sequence[float]) -> dict:
     """Status counts, claims kept and dropped (with the reasons) and the time taken, for a run of the
     real answering system. `results` are `AskResult`s."""
@@ -337,6 +356,9 @@ def summarize_answering(results: Sequence, latencies_s: Sequence[float]) -> dict
         "p90_s": percentile(0.9),
         "models": sorted({r.model for r in results if r.model}),
         "model_errors": sum(1 for r in results if any("could not be used" in w for w in r.warnings)),
+        "median_prompt_tokens": _median([r.prompt_tokens for r in results if r.prompt_tokens]),
+        "median_units_shown": _median([r.units_shown for r in results if r.units_total]),
+        "median_units_total": _median([r.units_total for r in results if r.units_total]),
     }
 
 
@@ -353,5 +375,10 @@ def format_answering(summary: dict) -> str:
         lines.append("Why claims were removed: " + "; ".join(f"{k} ({v})" for k, v in summary["drop_reasons"].items()))
     if summary["model_errors"]:
         lines.append(f"Questions where the model's reply could not be used: {summary['model_errors']}")
+    if summary.get("median_prompt_tokens"):
+        shown = summary.get("median_units_shown")
+        total = summary.get("median_units_total")
+        units = f"; units shown {shown:g} of {total:g} (median)" if shown and total else ""
+        lines.append(f"Prompt size: median {summary['median_prompt_tokens']:g} tokens{units}")
     lines.append(f"Time to answer: median {seconds(summary['median_s'])}, 90th percentile {seconds(summary['p90_s'])} (target: median under 15 s)")
     return "\n".join(lines)
