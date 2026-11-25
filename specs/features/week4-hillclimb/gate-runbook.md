@@ -15,7 +15,7 @@ Run every command from the repository root (`cd ~/Claude./podcast-recall` or whe
 | Answer check | off (`PODCAST_RECALL_ANSWER_CHECK=0`) | E4 not adopted; judge failed calibration |
 | Premise step | off (`PODCAST_RECALL_PREMISE_STEP=0`) | E9 not adopted: 3 unanswerable questions answered, which also fails D22 |
 | Unit selection | off (`PODCAST_RECALL_UNIT_TOP=0`) | E5a, E7, E11: faster but loses answerable questions |
-| Answer prompt | the original Week 3 prompt (`podcast_recall/prompting.py`, sha256 `0efc86c1...5e470191`, unchanged from commit `6257d09`) | E1 and E10 reverted |
+| Answer prompt | the Week 3 prompt plus the E12 rule (`podcast_recall/prompting.py`, sha256 `607953cd...d09f58`) | E1 and E10 reverted, E12 kept |
 | Judge model | not used for gating | Judge agreement 68% and 80% against the 85% bar; R3 and R4 graded by hand (D20 Q8, D22) |
 | Pinned defaults | `nomic-embed-text`, chunks 120 s with 24 s overlap | D17; pinned so a stray export cannot change the index |
 | Golden set | the 120-question set (file name to be fixed when it is built; see the assumption in section 3) | D20 Q2, Q7 |
@@ -26,7 +26,7 @@ Run every command from the repository root (`cd ~/Claude./podcast-recall` or whe
 
 All of these must be true, and ticked in `results.md`, before look 1:
 
-- [ ] **The PM's own hand grades on a sample.** The PM (a person, not a model stand-in) has graded at least a sample of claims from the full 14B dev run (`evals/grade_sheet_dev_20261124-0613.csv`, instructions in `evals/grading_instructions.md`; the top 35 rows if short of time) and the result is logged next to the two model graders' results (D22: "Before the held-out look, the PM hand-grades a sample of claims").
+- [x] **WAIVED by the PM on 2026-11-25 (D23). The PM's own hand grades on a sample.** The PM (a person, not a model stand-in) has graded at least a sample of claims from the full 14B dev run (`evals/grade_sheet_dev_20261124-0613.csv`, instructions in `evals/grading_instructions.md`; the top 35 rows if short of time) and the result is logged next to the two model graders' results (D22: "Before the held-out look, the PM hand-grades a sample of claims").
 - [ ] **The 120-question set is built** (D20 Q2, Q7): 60 new questions, 20 written by the PM in their own words, authorship recorded per question (`pm`, `pm_proxy`, `agent`), the same split rule (two thirds dev, one third held out, so 40 held out), false premises in several phrasings, and `eval check` passes on it.
 - [ ] **Nothing was tuned on held-out.** No setting, prompt or threshold was chosen by looking at held-out questions or their answers; the held-out looks counter in `results.md` still reads 0 of 3; the new held-out questions have not been run through `eval answer`.
 - [ ] **The version is frozen and tagged** (D20 Q12): the working tree is committed and tagged (commands below), and the prompt and model checks below pass.
@@ -43,9 +43,9 @@ shasum -a 256 podcast_recall/prompting.py
 Expected: `0efc86c1c97bbc077d939c907c80d2d252d88ca7cc26e3d647e2e02b5d470191`.
 
 ```bash
-git diff --stat 6257d09 -- podcast_recall/prompting.py
+git diff --stat week4-frozen-v2 -- podcast_recall/prompting.py
 ```
-Expected: no output (the Week 3 prompt).
+Expected: no output (the frozen version 2 prompt: Week 3 plus the E12 rule).
 
 ```bash
 ollama list
@@ -64,7 +64,7 @@ Expected: the ten settings in the env file and nothing else that changes answeri
 Tag the frozen version (PM's step, once the working tree is committed):
 
 ```bash
-git tag -a week4-frozen-20261125 -m "Week 4 frozen quality configuration (evals/frozen_config.env)"
+git tag -a week4-frozen-v2 -m "Week 4 frozen quality configuration v2: Week 3 prompt plus E12 rule (evals/frozen_config.env)"
 ```
 
 ## 3. Commands
@@ -158,7 +158,7 @@ Append (never rewrite) one entry per run under "Held-out looks" (look 1) or a ne
 
 ```markdown
 ### Gate run N (or Held-out look 1): YYYY-MM-DD
-- Version: tag `week4-frozen-20261125`, commit <hash>, `evals/frozen_config.env` unchanged, prompt sha256 0efc86c1..., models qwen2.5:14b-instruct <ollama id>, nomic-embed-text <ollama id>, golden set <file>.
+- Version: tag `week4-frozen-v2`, commit <hash>, `evals/frozen_config.env` unchanged, prompt sha256 607953cd..., models qwen2.5:14b-instruct <ollama id>, nomic-embed-text <ollama id>, golden set <file>.
 - Command: <the exact block from the runbook>. Files: `evals/scorecards/<name>.csv` (+ .answers.jsonl, .trace.jsonl, git-ignored).
 - Release gate (D22): R1/R2 failures x/n; unanswerable answered x/m; quote-first check passed yes/no. **PASS / FAIL.**
 - Reported: deterministic grounded x/n; hand-graded answers passing R3+R4 x/y (grader: PM or stand-in, sheet fully or partly graded); Critical x/y; answerable refused x/k; R7 x/t; median s, p90 s.
