@@ -295,3 +295,30 @@ Sheets: `evals/grade_sheet_e12_dev_agent.csv` (114 claims, 43 answers) and `eval
 - Week 3 figure on the 60-question set: recall@5 70%. The set is now larger and harder (more new single-fact questions), so the two numbers are not the same test. Recall@10 equal to recall@5 means a miss is a miss at 10 too: the gold passage is not retrieved at all, not merely ranked low.
 - Several misses (sf06, p11, ww10, v1_005, v1_007, v1_014) are the questions the answer runs refused for "gold passage not shown", so search remains the main cause of refusals of answerable questions. Reranker (D17) still not built.
 - To measure the frozen configuration, rerun with `PODCAST_RECALL_INTRO_WEIGHT=0.5`.
+
+### Fresh questions for gate run 3 (2026-11-26)
+- `data/golden/golden_v2_fresh20.csv`: 20 questions never run through the system (8 single_fact, 4 synthesis, 3 who_when, 2 false_premise in two new phrasings ("Can you find me the clip where X says ...", "Remind me of the reasons X gave for ..."), 2 unanswerable, 1 not_in_library), author `pm_proxy` (model-written in a PM's voice), tag `gate3`, `eval check` 0 errors 0 warnings, evidence read against the transcripts by the writer.
+- Less sure rows: f20_012 (evidence overlaps n09's passage), f20_007 (theme close to v1_007), f20_018 (a nearby topic could be mistaken for an answer, harder to grade), f20_003 and f20_020 (episode opens with a preview of the line). Greg Isenberg episodes supply over half the rows.
+- Gate run 3 (the PM runs it): `( source evals/frozen_config.env && .venv/bin/podcast-recall eval answer --golden data/golden/golden_v2_fresh20.csv --split dev --out evals/scorecards/gate3_fresh20_20261126.csv )`.
+
+### Gate run 3: 20 fresh questions (2026-11-26), frozen version 2 — code-checked result; model-graded part pending
+- Files `evals/scorecards/gate3_fresh20_20261126.*` and `.diagnosis.csv`. Questions never run before (`data/golden/golden_v2_fresh20.csv`, written by an agent in a PM's voice).
+- **Release gate (D22): met.** R1/R2 failures 0/20; unanswerable or not-in-library answered **0/3**.
+- Stretch targets (code rules): grounded accuracy **17/20 = 85%** (target 90%, not met), Critical failures **0/20** (target 2%, met on this run). By type: single_fact 8/8, who_when 3/3, synthesis 3/4, unanswerable 2/2, not_in_library 1/1, false_premise 0/2. Answerable refused 1/15 (f20_010, a synthesis question: the gold passage was shown and the model still said not found). R7 5/11 = 45%. Median 130.0 s, p90 181.9 s (slower than the other v2 runs; machine load varies). The two false-premise questions (f20_016, f20_017, the two new phrasings) were both refused, not corrected and not affirmed.
+- Fresh questions give code-checked results close to dev and held-out (85% against 78 to 79%) on a small set (20); not a significant difference.
+- **Model-graded R3/R4 (blind agent, no human check, D23), 38 claims of 14 answers:** R3 yes 12 / partly 15 / no 11 (32% / 39% / 29%); R4 yes 38/38; answers the question yes 14 / partly 18 / no 6. Answered questions passing R3+R4: **1/14 (7%)**; with a Critical failure **9/14 (64%)**. Whole-set hand-graded grounded **4/20 = 20%**, Critical **9/20 = 45%**.
+- **Reading:** on questions the system has never seen, claim support is worse than on dev (35%) and held-out (40%) by this reading: R3 yes 32% against 47% and 57%. Caveats: only 20 questions and 14 answers, a different grader batch (strictness varies between agents; the same-sheet agreement between graders was 87 to 93%), questions written by a model in one sitting with some deliberately hard rows (f20_018, f20_012). It is still a warning that dev and held-out hand-graded numbers may be optimistic. **Release gate met; all three stretch-target readings (code 85%, hand-graded 20%) are far below the 90% target in the hand-graded view.**
+
+## Week 4 closing summary (2026-11-26)
+| Check | dev (80, E12) | held-out look 1 (40) | gate run 3 (20 fresh) |
+|---|---|---|---|
+| Release gate: R1/R2 failures | 0 | 0 | 0 |
+| Release gate: unanswerable or not-in-library answered | 0/22 | 0/10 | 0/3 |
+| Grounded, code rules (stretch 90%) | 79% | 78% | 85% |
+| Critical, code rules (stretch 2%) | 2% | 5% | 0% |
+| Grounded, model-graded whole set (no human check) | 35% | 40% | 20% |
+| R3 yes (claims) | 47% | 57% | 32% |
+| Answerable refused | 6/47 | 3/24 | 1/15 |
+| Median time | 86 s | 79 s | 130 s |
+- The release gate (D22) held on all three sets with the frozen version 2. The D20 stretch targets are not met under the hand-graded reading, and the hand-graded numbers are model-graded.
+- Held-out looks used: 1 of 3. Experiments: 12 of 13. Open items are listed in `docs/Week4_Explained.md` section 10.

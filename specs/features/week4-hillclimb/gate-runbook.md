@@ -103,10 +103,10 @@ Gate run 2, the held-out split (this is held-out look 3; see section 6):
 ( source evals/frozen_config.env && .venv/bin/podcast-recall eval answer --golden data/golden/golden_v1.csv --split heldout --out evals/scorecards/gate2_heldout_YYYYMMDD.csv )
 ```
 
-Gate run 3, the 20 fresh PM-written questions never used for tuning. The CLI has no split for them, so pass their ids (the `pm` or `pm_proxy` questions from the new v1 set that were not used in any experiment; list them with `grep -E ',pm(_proxy)?,' data/golden/golden_v1.csv | cut -d, -f1`, then join with commas):
+Gate run 3, the 20 fresh questions never used for tuning (`data/golden/golden_v2_fresh20.csv`, written by an agent in a PM's voice, `eval check` clean; not questions the PM wrote). All 20 are in the file's `dev` split, which here only means "not held-out":
 
 ```bash
-( source evals/frozen_config.env && .venv/bin/podcast-recall eval answer --golden data/golden/golden_v1.csv --ids ID1,ID2,ID3 --out evals/scorecards/gate3_pm_YYYYMMDD.csv )
+( source evals/frozen_config.env && .venv/bin/podcast-recall eval answer --golden data/golden/golden_v2_fresh20.csv --split dev --out evals/scorecards/gate3_fresh20_YYYYMMDD.csv )
 ```
 
 All three must meet the release gate (section 4). The D20 stretch targets (90% and 2%) are reported for each.

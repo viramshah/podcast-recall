@@ -67,6 +67,8 @@ There are two scores, and the gap between them is the main finding of the week.
 
 **Held-out was not worse than dev.** That is good news: the settings tuned on dev did not overfit.
 
+**Fresh questions were worse by the hand-graded reading.** On 20 questions the system had never seen (gate run 3), the code-checked score was 85% and the release gate held, but the careful-reader score was **20%** (claims fully supported: 32%, against 47% on dev and 57% on held-out). It is a small set and a different grader batch, so do not over-read it; the safe reading is that the dev and held-out hand-graded numbers may be a little optimistic.
+
 ## 6. The release gate, and why it changed (D22)
 
 Week 4's original gate was "at least 90% grounded, at most 2% hallucination, three runs in a row", and the standing rule was never to lower it. By the middle of the week the evidence said the 90% was not reachable with a free local model, and Question 18 of the Week 4 spec said what to do then: report honestly, then choose with you between a bigger model, narrowing the promise, or a hosted model. You chose to **split the gate (D22)** and keep the quote real and visible:
@@ -115,7 +117,7 @@ The system rarely agrees with a false premise, but it almost never corrects one.
 
 - **Your own hand grades** on the 30 claims in `evals/grade_sheet_pm_30.csv` (waived, D23, but it is the only thing that would turn "model-graded" into "human-checked").
 - **Your own 20 questions** (D20 Q7). The 20 "PM" questions in the 120-question set were written by a model in a PM's voice.
-- **Gate run 3** on fresh questions: the 20 fresh questions were handed to an agent to draft (`data/golden/golden_v2_fresh20.csv`, not confirmed written when this guide was produced); you run them once they exist and are checked.
+- **Gate run 3 is done** on 20 fresh questions (`data/golden/golden_v2_fresh20.csv`, written by an agent in a PM's voice, not by you): release gate met (0 invented citations, 0 of 3 unanswerable answered), code-checked 85%, hand-graded 20% (section 5).
 - **Gate runs 1 and 2 on the frozen version** (dev and held-out) as a three-run record, and held-out looks 2 and 3 (1 of 3 used).
 - **The 90% target is not met;** a decision is due before Week 6 on whether to (a) try a hosted model (a policy question outside this project), (b) narrow the promise to the question types that pass, or (c) change what the product claims. The roadmap's Week 6 gate ("still at least 90%") must be re-decided.
 - **A real fix for claim support.** E10 failed; the likely lever is what the model is shown and how quotes are chosen, not how claims are worded. A judge that qualifies would also allow the checker idea (E4) to work.

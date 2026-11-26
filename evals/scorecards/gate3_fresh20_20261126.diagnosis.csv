@@ -1,0 +1,4 @@
+id,type,status,cause,detail
+f20_010,synthesis,not_found,model_refused_with_gold_passage_shown,
+f20_016,false_premise,not_found,false_premise_not_corrected,R5
+f20_017,false_premise,not_found,false_premise_not_corrected,R5
