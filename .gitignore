@@ -19,3 +19,4 @@ evals/scorecards/*.trace.json*
 evals/judge_sheet*.csv
 evals/judge_agreement*.csv
 evals/grade_sheet*.csv
+evals/false_premise_review.csv

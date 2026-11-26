@@ -140,6 +140,8 @@ uv run podcast-recall eval judge-sheet --answers RUN.answers.jsonl --count 60   
 uv run podcast-recall eval judge-agreement --sheet evals/judge_sheet.csv --answers RUN.answers.jsonl   # judge vs the person's labels
 uv run podcast-recall eval abstain --split dev                    # can search distance alone say "not found"?
 uv run podcast-recall eval diagnose --answers evals/scorecards/RUN.answers.jsonl   # why each failing question failed
+uv run podcast-recall eval grade-sheet --answers RUN.answers.jsonl --out evals/grade_sheet_RUN.csv   # every claim of a run, for a person to grade R3, R4 and answers-the-question
+uv run podcast-recall eval grade-score --answers RUN.answers.jsonl --sheet evals/grade_sheet_RUN.csv   # scores the graded sheet (any R3 no or R4 no is Critical; partly is Major)
 ```
 
 Every answer is checked before you see it: the model only points at numbered passages, the code copies

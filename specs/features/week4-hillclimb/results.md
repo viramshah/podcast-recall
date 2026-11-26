@@ -1,6 +1,6 @@
 # Week 4 results (running log)
 
-Status: **in progress.** Method: diagnose, change one thing, rerun dev (or a targeted subset), keep or revert, log here. Held-out looks used: **0 of 3**. Experiments logged: **12 of 13 (budget extended by the PM on 2026-11-25 for E11 to E13; E12 kept)** (E10 reverted) (E9 not adopted) (E1 reverted, E2 not adopted, E3 partial, E4 not adopted, E5a not adopted, E6 provisional, E7 reverted, E8 kept, E9 not adopted).
+Status: **in progress.** Method: diagnose, change one thing, rerun dev (or a targeted subset), keep or revert, log here. Held-out looks used: **1 of 3**. Experiments logged: **12 of 13 (budget extended by the PM on 2026-11-25 for E11 to E13; E12 kept)** (E10 reverted) (E9 not adopted) (E1 reverted, E2 not adopted, E3 partial, E4 not adopted, E5a not adopted, E6 provisional, E7 reverted, E8 kept, E9 not adopted).
 
 ## Diagnosis of the Week 3 dev run (2026-11-22, 40 questions, 27 pass, 13 fail)
 Run `answers_dev_20261122-1949` (identical scores to the earlier run 2: 27/40, so runs are reproducible at temperature 0). `eval diagnose` gives each failure one cause:
@@ -257,3 +257,41 @@ The PM chose: calibrate with a fresh grader (step 1), then extend the budget for
 - Stand-in evidence: three blind model graders agree on the 30 claims (R3 exact 25 to 29 of 30 per pair; the same 4 claims R3 no for all three; R4 30/30), and two graders agree on all 69 claims (R3 64 of 69).
 - **Reporting rule from now on:** any R3, R4 or answers-the-question number is labelled "model-graded, no human check"; the held-out look is reported the same way. The blank sheet `evals/grade_sheet_pm_30.csv` remains available; grading it later would close the gap.
 - Other pre-conditions: 120-question set built and checked (met; the 20 PM-written questions are still `pm_proxy`, not the PM's own words, a separate open item); nothing tuned on held-out (met; looks used 0 of 3); frozen version committed and tagged (PM to run the commit and tag commands for version 2).
+
+## Held-out look 1 (2026-11-26) — 1 of 3 looks used; frozen version 2, 40 held-out questions; model-graded where noted, no human check (D23)
+- Files `evals/scorecards/heldout_look1_20261126.*` and `.diagnosis.csv`. Purpose: confirm on held-out what was tuned on dev (intro weight 0.5, the 14B model, the E12 rule). A measurement of one version, no variant compared (D20 Q11).
+- **Release gate (D22): met.** R1/R2 failures 0/40; unanswerable or not-in-library answered **0/10** (not_in_library 5/5, unanswerable 5/5).
+- Stretch targets (code rules): grounded accuracy **31/40 = 78%** (dev with E12: 79%, so the result generalises; target 90%, **not met**), Critical failures 2/40 = 5% (target 2%, not met). Answerable refused 3/24 (r06, v1_005, v1_007, all "gold passage not shown", i.e. retrieval). R7 11/17 = 65%. Synthesis episode coverage 57%. Median 78.8 s, p90 118.2 s.
+- By type: single_fact 10/12, synthesis 7/7, who_when 4/5, not_in_library 5/5, unanswerable 5/5, **false_premise 0/6**.
+- **The two Critical answers are both false-premise questions where the content is right but the status is not `premise_corrected`:** v1_029 ("Jen Abel said ... around 50%, right? what was the exact number?") answered "around 30 to 35%", which corrects the premise; v1_034 ("Why does the Gamma co-founder say startups need to fine-tune their own models ...?") answered that training and fine-tuning your own models from day one is unrealistic for early-stage startups, the opposite of the premise. Neither confirms the false premise. The R5 rule scores them Critical because the status says `answered`. The same happened with v1_039 on dev (before E12).
+- **False premise overall (dev with E12 + held-out): 0/17 on the status rule.** Behaviour is mixed: some questions are refused (safe, unhelpful), some are answered with the right facts (helpful, status wrong), and a few (v1_032) go along with the premise. A human or model should read these 17 answers; the status rule alone cannot tell the three apart. **Open decision for the PM (rubric change after seeing results, so it must be explicit):** whether a false-premise answer whose claims state the contradicting facts counts as correct for R5.
+- Pre-conditions: PM hand grading waived (D23); nothing was tuned on held-out; looks used 1 of 3.
+
+### False premise by content (D24, 2026-11-26) — model-classified, no human check
+- A blind agent classified the 17 false-premise answers (11 dev with E12, 6 held-out look 1; `evals/false_premise_review.csv`): **refused 13, corrected 2 (v1_029, v1_034), went along with the premise 1 (v1_032), other 1 (v1_036).**
+- **Strict status rule: 0/17. By content: 2/17 corrected (12%), 13/17 refused (safe, unhelpful), 1 went along (a Critical failure under both readings), 1 other.**
+- v1_029 is marked corrected with a caveat: the claim says "30 to 35%" while the quote says 25% to 35%; the reader still learns the rate is far below 50%. v1_036 neither corrects nor confirms.
+- **Reading:** the system almost never corrects a false premise; it mostly refuses, which keeps it safe. The by-content view moves the false-premise figure from 0% to 12% and shows the real problem is refusal, not fabrication: 1 of 17 went along with the premise.
+
+## Model-graded R3/R4 on the frozen version 2 runs (2026-11-26) — blind agents, **no human check** (D23)
+Sheets: `evals/grade_sheet_e12_dev_agent.csv` (114 claims, 43 answers) and `evals/grade_sheet_heldout1_agent.csv` (58 claims, 23 answers); scored with `eval grade-score`. Rule: any R3 no or R4 no is Critical; R3 partly or a claim that does not answer is Major (D5).
+
+| | Dev (E12, 80 q) | Held-out look 1 (40 q) |
+|---|---|---|
+| Claims R3 yes / partly / no | 54 / 39 / 21 of 114 (47% / 34% / 18%) | 33 / 13 / 12 of 58 (57% / 22% / 21%) |
+| Claims R4 yes | 112 of 114 (the two `no` are ww04#1 and #2: a name, Dan Shipper, that nothing in the episode or question supports) | 58 of 58 |
+| Claims answering the question yes | 38 of 114 (33%) | 29 of 58 (50%) |
+| Answered questions passing R3+R4 | 6/43 = 14% | 6/23 = 26% |
+| Answered questions with a Critical failure | 16/43 = 37% | 11/23 = 48% |
+| **Whole-set hand-graded grounded** (correct abstentions count as passes; answered questions need a clean hand grade) | **28/80 = 35%** | **16/40 = 40%** |
+| **Whole-set Critical** (R5 Critical or R3 no or R4 no) | **18/80 = 22%** | **11/40 = 28%** |
+- Together: 12 of 66 answered questions (18%) are fully clean, 27 of 66 (41%) have a Critical failure.
+- **Gates under this reading: the 90% grounded and the 2% hallucination targets are far from met**, and the release gate (code-checked, D22) is met. The code-checked 78 to 79% overstates grounded accuracy by about 40 points because it cannot see whether a claim says more than its quote.
+- **Common causes (from the graders' notes):** claims with a time or detail not in the quote (timestamps, "80%", "LinkedIn", definitions); answering a "when" question with a "what"; quotes cut off before the key phrase; a named person the episode does not support (ww04 Dan Shipper, a possible attribution defect worth a look); advice drawn from an example or a hypothetical.
+- **Held-out is not worse than dev on this reading** (40% vs 35% whole-set), so there is no sign of overfitting to dev; the gap to the targets is a system-wide property.
+
+### Retrieval on the 120-question set (validation step 5, 2026-11-26)
+- `eval retrieval --golden data/golden/golden_v1.csv`, **run without `evals/frozen_config.env`, so with the default intro weight of 1 (not the frozen 0.5)**: 50 questions with a gold time. **Recall@5 68%** (target 85%, **not met**), recall@10 68%, MRR 0.54; single_fact 62% on 34, who_when 81% on 16; synthesis episode coverage in the top 5 73% on 21; **results from outside the library 0 (must be 0, met)**. Missed: sf03, sf06, sf07, sf12, sf13, sf14, p11, r06, ww10, v1_003, v1_005, v1_007, v1_008, v1_010, v1_012, v1_014.
+- Week 3 figure on the 60-question set: recall@5 70%. The set is now larger and harder (more new single-fact questions), so the two numbers are not the same test. Recall@10 equal to recall@5 means a miss is a miss at 10 too: the gold passage is not retrieved at all, not merely ranked low.
+- Several misses (sf06, p11, ww10, v1_005, v1_007, v1_014) are the questions the answer runs refused for "gold passage not shown", so search remains the main cause of refusals of answerable questions. Reranker (D17) still not built.
+- To measure the frozen configuration, rerun with `PODCAST_RECALL_INTRO_WEIGHT=0.5`.

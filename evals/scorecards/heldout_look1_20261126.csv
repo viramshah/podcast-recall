@@ -1,0 +1,41 @@
+id,type,split,tags,status,passed,critical,rules_failed,r7,episode_recall,needs_review,reasons
+n01,single_fact,heldout,raj,answered,1,0,,1,,0,
+p05,single_fact,heldout,,answered,1,0,,1,,0,
+p06,single_fact,heldout,,answered,1,0,,0,,0,R7: the nearest cited time is 41 s from the gold time (allowed 15 s)
+r01,single_fact,heldout,,answered,1,0,,1,,0,
+sf02,single_fact,heldout,raj,answered,1,0,,1,,0,
+sf05,single_fact,heldout,raj,answered,1,0,,1,,0,
+sf13,single_fact,heldout,,answered,1,0,,1,,0,
+p09,synthesis,heldout,,answered,1,0,,,0.50,0,
+p10,synthesis,heldout,,answered,1,0,,,0.50,0,
+r03,synthesis,heldout,,answered,1,0,,,0.50,0,
+sy02,synthesis,heldout,raj,answered,1,0,,,0.50,0,
+p12,who_when,heldout,,answered,1,0,,1,,0,
+r06,who_when,heldout,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (YS9In813jJ0)
+ww06,who_when,heldout,raj,answered,1,0,,0,,0,R7: the nearest cited time is 35 s from the gold time (allowed 15 s)
+p15,unanswerable,heldout,,not_found,1,0,,,,0,
+un06,unanswerable,heldout,raj,not_found,1,0,,,,0,
+fp04,false_premise,heldout,raj,not_found,0,0,R5,,,0,"R5: the status is not_found, expected premise_corrected"
+n18,false_premise,heldout,,not_found,0,0,R5,,,0,"R5: the status is not_found, expected premise_corrected"
+nl04,not_in_library,heldout,,not_found,1,0,,,,0,
+p19,not_in_library,heldout,,not_found,1,0,,,,0,
+v1_001,single_fact,heldout,raj,answered,1,0,,1,,0,
+v1_005,single_fact,heldout,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (YS9In813jJ0)
+v1_007,single_fact,heldout,,not_found,0,0,R5,0,,0,R5: refused to answer (status not_found) a question that can be answered | R7: no citation to the gold episode (19qrLchbQEc)
+v1_011,single_fact,heldout,raj,answered,1,0,,1,,0,
+v1_012,single_fact,heldout,,answered,1,0,,0,,0,R7: the nearest cited time is 203 s from the gold time (allowed 15 s)
+v1_016,synthesis,heldout,,answered,1,0,,,1.00,0,
+v1_018,synthesis,heldout,,answered,1,0,,,0.50,0,
+v1_022,synthesis,heldout,,answered,1,0,,,0.50,0,
+v1_024,who_when,heldout,raj,answered,1,0,,1,,0,
+v1_027,who_when,heldout,,answered,1,0,,1,,0,
+v1_029,false_premise,heldout,,answered,0,1,R5,,,0,R5: answered a question that should get 'premise_corrected'
+v1_031,false_premise,heldout,raj,not_found,0,0,R5,,,0,"R5: the status is not_found, expected premise_corrected"
+v1_034,false_premise,heldout,,answered,0,1,R5,,,0,R5: answered a question that should get 'premise_corrected'
+v1_038,false_premise,heldout,raj,not_found,0,0,R5,,,0,"R5: the status is not_found, expected premise_corrected"
+v1_043,unanswerable,heldout,,not_found,1,0,,,,0,
+v1_046,unanswerable,heldout,raj,not_found,1,0,,,,0,
+v1_049,unanswerable,heldout,,not_found,1,0,,,,0,
+v1_053,not_in_library,heldout,,not_found,1,0,,,,0,
+v1_056,not_in_library,heldout,,not_found,1,0,,,,0,
+v1_059,not_in_library,heldout,,not_found,1,0,,,,0,

@@ -1,0 +1,10 @@
+id,type,status,cause,detail
+r06,who_when,not_found,gold_passage_not_shown,
+fp04,false_premise,not_found,false_premise_not_corrected,R5
+n18,false_premise,not_found,false_premise_not_corrected,R5
+v1_005,single_fact,not_found,gold_passage_not_shown,
+v1_007,single_fact,not_found,gold_passage_not_shown,
+v1_029,false_premise,answered,false_premise_not_corrected,R5
+v1_031,false_premise,not_found,false_premise_not_corrected,R5
+v1_034,false_premise,answered,false_premise_not_corrected,R5
+v1_038,false_premise,not_found,false_premise_not_corrected,R5
