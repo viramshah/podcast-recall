@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "FindingModel": {
+      "properties": {
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "integer"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "saved_at": {
+          "title": "Saved At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "question",
+        "note",
+        "saved_at"
+      ],
+      "title": "FindingModel",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/FindingModel"
+      },
+      "title": "Findings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "findings"
+  ],
+  "title": "FindingsResponse",
+  "type": "object"
+}

@@ -7,6 +7,7 @@ Exit codes: 0 success, 1 error, 2 partial, 3 sign-in needed.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from datetime import datetime
 
@@ -135,6 +136,54 @@ def cmd_status(args) -> int:
     if s.last_run:
         skipped = sum(x.get("skipped_unavailable", 0) for x in s.last_run["counts"].get("sources", []))
     print(f"Unavailable: {s.unavailable_in_library} in library, {skipped} skipped in last sync")
+    return EXIT_OK
+
+
+def cmd_findings_list(args) -> int:
+    rows = core.list_findings(args.user)
+    if not rows:
+        print("No findings saved yet. Save one from the web chat (Save finding).")
+        return EXIT_OK
+    for row in rows:
+        note = f"  note: {row['note']}" if row["note"] else ""
+        print(f"{row['finding_id']:>4}  {row['saved_at'][:10]}  {row['question'][:90]}{note}")
+    return EXIT_OK
+
+
+def cmd_findings_show(args) -> int:
+    from podcast_recall import exporter
+
+    items = [i for i in core.finding_items(args.user) if i.finding_id == args.id]
+    if not items:
+        raise ConfigError(f"There is no finding {args.id} for this user.")
+    print(exporter.render_markdown(items), end="")
+    return EXIT_OK
+
+
+def cmd_findings_note(args) -> int:
+    core.update_finding_note(args.id, args.text, args.user)
+    print(f"Updated the note on finding {args.id}.")
+    return EXIT_OK
+
+
+def cmd_findings_delete(args) -> int:
+    core.delete_finding(args.id, args.user)
+    print(f"Deleted finding {args.id}. Files you already exported keep their copy until you export again.")
+    return EXIT_OK
+
+
+def cmd_findings_export(args) -> int:
+    if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
+        raise ConfigError("--since must look like 2026-11-26.")
+    if args.format == "notes":
+        result, count = core.export_findings_to_notes(args.user, since=args.since, show=args.show)
+        print(f"{result.capitalize()} the Apple Notes note with {count} finding(s). It reaches your iPhone through iCloud.")
+        return EXIT_OK
+    path, count = core.export_findings(
+        args.format, args.user, since=args.since, show=args.show, out=args.out, force=args.force
+    )
+    print(f"Wrote {count} finding(s) to {path}")
+    print("This file holds your questions and short transcript quotes; keep it private.")
     return EXIT_OK
 
 
@@ -1057,6 +1106,32 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-record", action="store_true", help="do not store this question and answer")
     p.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",
                    help=f"answer from the seed file's episodes instead of your library (default file: {DEFAULT_SEED})")
+    findings = sub.add_parser("findings", help="List, edit, delete and export saved findings.")
+    fsub = findings.add_subparsers(dest="command", required=True)
+
+    def fadd(name: str, func, help_text: str) -> argparse.ArgumentParser:
+        sp = fsub.add_parser(name, help=help_text, description=help_text)
+        sp.set_defaults(func=func)
+        sp.add_argument("--user", default=core.OWNER, help="local user name (default: owner)")
+        return sp
+
+    fadd("list", cmd_findings_list, "List saved findings, newest first.")
+    p = fadd("show", cmd_findings_show, "Show one finding as it will be exported.")
+    p.add_argument("id", type=int, help="the finding number from `findings list`")
+    p = fadd("note", cmd_findings_note, "Change the note on a finding.")
+    p.add_argument("id", type=int, help="the finding number")
+    p.add_argument("text", help="the new note (use \"\" to clear it)")
+    p = fadd("delete", cmd_findings_delete, "Delete a finding (the quotes and answer are never edited).")
+    p.add_argument("id", type=int, help="the finding number")
+    p = fadd("export", cmd_findings_export, "Write the findings to Markdown, HTML or Apple Notes.")
+    p.add_argument("--format", choices=("md", "html", "notes"), default="md",
+                   help="md (default), html (opens on a phone) or notes (Apple Notes, Mac only)")
+    p.add_argument("--since", metavar="YYYY-MM-DD", help="only findings saved on or after this date")
+    p.add_argument("--show", help="only findings that cite this show")
+    p.add_argument("--out", metavar="FILE_OR_FOLDER",
+                   help="where to write (default: ~/Documents/Podcast Recall exports/)")
+    p.add_argument("--force", action="store_true", help="overwrite a file that Podcast Recall did not create")
+
     p = add("serve", cmd_serve, "Start the local web chat (this computer only).")
     p.add_argument("--port", type=int, default=8000, help="port to listen on (default 8000)")
     p.add_argument("--seed", nargs="?", const=DEFAULT_SEED, default=None, metavar="FILE",

@@ -208,3 +208,9 @@ def video_refresh_days() -> int:
     if days < 1:
         raise ConfigError("PODCAST_RECALL_VIDEO_REFRESH_DAYS must be at least 1.")
     return days
+
+
+def export_dir() -> Path:
+    """Where exported findings are written (decision D25). Outside the data home and the repo."""
+    override = os.environ.get("PODCAST_RECALL_EXPORT_DIR")
+    return Path(override).expanduser() if override else Path.home() / "Documents" / "Podcast Recall exports"

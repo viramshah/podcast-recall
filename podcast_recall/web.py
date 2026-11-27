@@ -17,9 +17,9 @@ import threading
 from importlib import resources
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
-from podcast_recall import core, embeddings, llm, paths, retrieval, schemas
+from podcast_recall import core, embeddings, exporter, llm, paths, retrieval, schemas
 from podcast_recall.answering import AnswerServices
 from podcast_recall.errors import ApiError, ConfigError, NotSignedIn, PodcastRecallError
 from podcast_recall.golden import format_time
@@ -178,6 +178,37 @@ def create_app(
     @app.post("/api/findings", response_model=schemas.IdResponse)
     def findings(body: schemas.FindingRequest):
         return schemas.IdResponse(id=core.save_finding(body.request_id, body.note, user_id))
+
+    @app.get("/api/findings", response_model=schemas.FindingsResponse)
+    def list_findings():
+        return schemas.FindingsResponse(findings=[
+            schemas.FindingModel(finding_id=r["finding_id"], question=r["question"], note=r["note"], saved_at=r["saved_at"])
+            for r in core.list_findings(user_id)
+        ])
+
+    @app.get("/api/findings/export")
+    def export_findings(
+        format: str = Query(default="md", pattern=r"^(md|html)$"),
+        since: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        show: str | None = Query(default=None, max_length=200),
+    ):
+        text = exporter.render(core.finding_items(user_id, since=since, show=show), format)
+        kind = "text/markdown" if format == "md" else "text/html"
+        name = exporter.file_name(format, since, show)
+        return Response(
+            text, media_type=f"{kind}; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{name}"', "X-Content-Type-Options": "nosniff"},
+        )
+
+    @app.put("/api/findings/{finding_id}", response_model=schemas.IdResponse)
+    def change_finding_note(finding_id: int, body: schemas.FindingNoteRequest):
+        core.update_finding_note(finding_id, body.note, user_id)
+        return schemas.IdResponse(id=finding_id)
+
+    @app.delete("/api/findings/{finding_id}", response_model=schemas.IdResponse)
+    def remove_finding(finding_id: int):
+        core.delete_finding(finding_id, user_id)
+        return schemas.IdResponse(id=finding_id)
 
     return LocalOnly(app, port, token)
 

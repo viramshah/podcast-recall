@@ -36,6 +36,7 @@ Settings come only from environment variables.
 | `PODCAST_RECALL_ANSWER_TIMEOUT_S` | `120` | How long to wait for the model before retrying once and then giving up with a plain message. |
 | `PODCAST_RECALL_PASSAGES` | `8` | How many search results (passages) the model is shown for each question. |
 | `PODCAST_RECALL_UNIT_TOP` | `0` (off) | Experiment: show the answering model only this many best-matching units (plus their neighbours) from the retrieved passages instead of every unit. Smaller prompt, faster, easier to point at the right unit. Needs the embedding model at question time. |
+| `PODCAST_RECALL_EXPORT_DIR` | `~/Documents/Podcast Recall exports` | Where `findings export` writes files (mode 600). Exports hold your questions and short transcript quotes; revoking your account does not delete files already exported. |
 | `PODCAST_RECALL_PREMISE_STEP` | off | Experiment: when the answer is "not found" and the question is about what someone says ("Why does X say ...?"), one more model call checks whether the passages contradict what the question assumes and, if so, answers with a correction. Only runs after a "not found". |
 | `PODCAST_RECALL_ANSWER_CHECK` | off | Set to `1` to have a second model check every answer before it is shown: each claim must be clearly supported by its quote and must answer the question, otherwise it is dropped (and the answer becomes "not found" if none is left). Adds one model call per answer. |
 | `PODCAST_RECALL_JUDGE_MODEL` | `llama3.1:8b` | The model that does that check (a different family from the answer model). Pull it with `ollama pull llama3.1:8b`. |
@@ -139,6 +140,9 @@ uv run podcast-recall eval answer --split dev --ids p01,sf09 --check --unit-top 
 uv run podcast-recall eval judge-sheet --answers RUN.answers.jsonl --count 60   # claims for a person to label
 uv run podcast-recall eval judge-agreement --sheet evals/judge_sheet.csv --answers RUN.answers.jsonl   # judge vs the person's labels
 uv run podcast-recall eval abstain --split dev                    # can search distance alone say "not found"?
+uv run podcast-recall findings list   # saved findings, newest first
+uv run podcast-recall findings export --format html   # md (default), html (opens on a phone) or notes (Apple Notes, Mac only); files go to ~/Documents/Podcast Recall exports/
+uv run podcast-recall findings note 1 "for the deck"; uv run podcast-recall findings delete 1
 uv run podcast-recall eval diagnose --answers evals/scorecards/RUN.answers.jsonl   # why each failing question failed
 uv run podcast-recall eval grade-sheet --answers RUN.answers.jsonl --out evals/grade_sheet_RUN.csv   # every claim of a run, for a person to grade R3, R4 and answers-the-question
 uv run podcast-recall eval grade-score --answers RUN.answers.jsonl --sheet evals/grade_sheet_RUN.csv   # scores the graded sheet (any R3 no or R4 no is Critical; partly is Major)

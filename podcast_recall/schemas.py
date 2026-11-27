@@ -74,6 +74,21 @@ class IdResponse(BaseModel):
     id: int
 
 
+class FindingNoteRequest(BaseModel):
+    note: str = Field(default="", max_length=1000)
+
+
+class FindingModel(BaseModel):
+    finding_id: int
+    question: str
+    note: str
+    saved_at: str
+
+
+class FindingsResponse(BaseModel):
+    findings: list[FindingModel]
+
+
 class SearchHitModel(BaseModel):
     chunk_id: int
     episode_id: int
@@ -117,6 +132,8 @@ MODELS = {
     "feedback_request": FeedbackRequest,
     "finding_request": FindingRequest,
     "id_response": IdResponse,
+    "finding_note_request": FindingNoteRequest,
+    "findings_response": FindingsResponse,
     "search_response": SearchResponse,
     "transcript_window_response": TranscriptWindowResponse,
     "health_response": HealthResponse,

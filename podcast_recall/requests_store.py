@@ -78,3 +78,27 @@ def list_findings(conn: sqlite3.Connection, user_id: str) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM findings WHERE user_id = ? ORDER BY saved_at DESC, finding_id DESC", (user_id,)
     ).fetchall()
+
+
+def get_finding(conn: sqlite3.Connection, finding_id: int, user_id: str) -> sqlite3.Row:
+    row = conn.execute(
+        "SELECT * FROM findings WHERE finding_id = ? AND user_id = ?", (finding_id, user_id)
+    ).fetchone()
+    if row is None:
+        raise ConfigError(f"There is no finding {finding_id} for this user.")
+    return row
+
+
+def delete_finding(conn: sqlite3.Connection, finding_id: int, user_id: str) -> None:
+    get_finding(conn, finding_id, user_id)
+    with conn:
+        conn.execute("DELETE FROM findings WHERE finding_id = ? AND user_id = ?", (finding_id, user_id))
+
+
+def update_finding_note(conn: sqlite3.Connection, finding_id: int, user_id: str, note: str) -> None:
+    get_finding(conn, finding_id, user_id)
+    with conn:
+        conn.execute(
+            "UPDATE findings SET note = ? WHERE finding_id = ? AND user_id = ?",
+            (note.strip()[:1000], finding_id, user_id),
+        )

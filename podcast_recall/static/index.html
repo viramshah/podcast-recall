@@ -25,6 +25,9 @@
   .error { background: #fde8e8; border: 1px solid #f2b1b1; padding: .5rem .8rem; border-radius: 8px; }
   .actions { display: flex; gap: .5rem; margin-top: 1rem; align-items: center; }
   .small { color: #666; font-size: .85rem; }
+  #saved { margin-top: 2rem; border-top: 1px solid #ddd; }
+  .finding { display: flex; gap: .5rem; align-items: baseline; margin: .4rem 0; }
+  .finding .q { flex: 1; }
 </style>
 </head>
 <body>
@@ -41,6 +44,16 @@
 </form>
 <div id="status" role="status"></div>
 <div id="out"></div>
+<section id="saved">
+  <h2>Saved findings</h2>
+  <div class="actions">
+    <button id="dl-md" type="button">Download Markdown</button>
+    <button id="dl-html" type="button">Download HTML (opens on a phone)</button>
+    <span class="small" id="saved-count"></span>
+  </div>
+  <div class="small">Files contain your questions and short quotes. Use <code>podcast-recall findings export</code> for Apple Notes.</div>
+  <div id="saved-list"></div>
+</section>
 <script>
 "use strict";
 const token = document.querySelector('meta[name="recall-token"]').content;
@@ -109,13 +122,50 @@ function renderAnswer(data) {
     const send = async (path, body, done) => { try { await api(path, { method: "POST", body: JSON.stringify(body) }); msg.textContent = done; } catch (e) { msg.textContent = e.message; } };
     up.onclick = () => send("/api/feedback", { request_id: data.request_id, thumbs: 1 }, "Thanks.");
     down.onclick = () => send("/api/feedback", { request_id: data.request_id, thumbs: -1 }, "Thanks, noted.");
-    save.onclick = () => send("/api/findings", { request_id: data.request_id }, "Saved.");
+    save.onclick = async () => { await send("/api/findings", { request_id: data.request_id }, "Saved."); loadSaved(); };
     save.disabled = answer.status === "not_found";
     bar.append(up, down, save, msg);
     out.appendChild(bar);
   }
   out.appendChild(el("div", "small", "Answered in " + (data.latency_ms / 1000).toFixed(1) + " s by " + data.model));
 }
+async function loadSaved() {
+  const list = document.getElementById("saved-list");
+  try {
+    const data = await api("/api/findings");
+    list.replaceChildren();
+    document.getElementById("saved-count").textContent = data.findings.length + (data.findings.length === 1 ? " finding" : " findings");
+    data.findings.forEach((f) => {
+      const row = el("div", "finding");
+      row.appendChild(el("span", "q", f.question + (f.note ? "  (note: " + f.note + ")" : "")));
+      const edit = el("button", null, "Edit note"), del = el("button", null, "Delete");
+      edit.onclick = async () => {
+        const note = window.prompt("Note for this finding", f.note);
+        if (note === null) return;
+        await api("/api/findings/" + f.finding_id, { method: "PUT", body: JSON.stringify({ note }) });
+        loadSaved();
+      };
+      del.onclick = async () => {
+        if (!window.confirm("Delete this finding? Files you already exported keep their copy.")) return;
+        await api("/api/findings/" + f.finding_id, { method: "DELETE" });
+        loadSaved();
+      };
+      row.append(edit, del);
+      list.appendChild(row);
+    });
+  } catch (e) { list.replaceChildren(el("div", "error", e.message)); }
+}
+async function download(format) {
+  const r = await fetch("/api/findings/export?format=" + format, { headers: { "X-Recall-Token": token } });
+  if (!r.ok) { document.getElementById("saved-count").textContent = "Export failed."; return; }
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement("a");
+  a.href = url; a.download = "podcast-recall-findings." + format;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+document.getElementById("dl-md").onclick = () => download("md");
+document.getElementById("dl-html").onclick = () => download("html");
+loadSaved();
 document.getElementById("f").addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = { question: document.getElementById("q").value.trim() };

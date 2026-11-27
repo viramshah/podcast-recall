@@ -698,6 +698,58 @@ def list_findings(user_id: str = OWNER, *, conn=None):
         return requests_store.list_findings(db, user_id)
 
 
+def delete_finding(finding_id: int, user_id: str = OWNER, *, conn=None) -> None:
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        requests_store.delete_finding(db, finding_id, user_id)
+
+
+def update_finding_note(finding_id: int, note: str, user_id: str = OWNER, *, conn=None) -> None:
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        requests_store.update_finding_note(db, finding_id, user_id, note)
+
+
+def finding_items(user_id: str = OWNER, *, since: str | None = None, show: str | None = None, conn=None):
+    """The saved findings, newest first, ready to export (the answer parsed, feedback and removed
+    claims joined in)."""
+    from podcast_recall import exporter
+
+    auth.validate_user_id(user_id)
+    with _Db(conn) as db:
+        _require_user(db, user_id)
+        return exporter.load_items(db, user_id, since=since, show=show)
+
+
+def export_findings(
+    fmt: str, user_id: str = OWNER, *, since: str | None = None, show: str | None = None,
+    out: str | None = None, force: bool = False, conn=None,
+):
+    """Write the findings to a file. Returns (path, number of findings)."""
+    from pathlib import Path
+
+    from podcast_recall import exporter
+
+    items = finding_items(user_id, since=since, show=show, conn=conn)
+    text = exporter.render(items, fmt)
+    target = Path(out).expanduser() if out else paths.export_dir() / exporter.file_name(fmt, since, show)
+    if out and target.is_dir():
+        target = target / exporter.file_name(fmt, since, show)
+    return exporter.write_export(target, text, force=force), len(items)
+
+
+def export_findings_to_notes(user_id: str = OWNER, *, since=None, show=None, conn=None, runner=None):
+    """Create or update the one Apple Notes note. Returns ("created" or "updated", number of findings)."""
+    from podcast_recall import applenotes, exporter
+
+    items = finding_items(user_id, since=since, show=show, conn=conn)
+    body = exporter.render_notes_html(items)
+    result = applenotes.write_note(body, runner) if runner else applenotes.write_note(body)
+    return result, len(items)
+
+
 def choose_items(items, split: str = "dev", limit: int | None = None, ids: Sequence[str] | None = None):
     """The golden questions a run covers: a split, optionally only some ids, optionally the first N."""
     chosen = [i for i in items if split == "all" or i.split == split]
